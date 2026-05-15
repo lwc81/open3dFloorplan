@@ -826,23 +826,29 @@
     const savedRooms = currentFloor.rooms || [];
     for (const nr of newRooms) {
       const nrWalls = new Set(nr.walls);
-      const existing = detectedRooms.find(old => {
-        const oldWalls = new Set(old.walls);
-        return oldWalls.size === nrWalls.size && [...nrWalls].every(w => oldWalls.has(w));
+      // Priority 1: match against saved (JSON) rooms — these are the user's
+      // canonical room definitions and should always win over transient
+      // detected-store leftovers from earlier sessions.
+      const saved = savedRooms.find(sr => {
+        const srWalls = new Set(sr.walls);
+        return srWalls.size === nrWalls.size && [...nrWalls].every(w => srWalls.has(w));
       });
-      if (existing) {
-        nr.id = existing.id;
-        nr.name = existing.name;
-        nr.floorTexture = existing.floorTexture;
+      if (saved) {
+        nr.id = saved.id;
+        nr.name = saved.name;
+        if (saved.floorTexture) nr.floorTexture = saved.floorTexture;
       } else {
-        const saved = savedRooms.find(sr => {
-          const srWalls = new Set(sr.walls);
-          return srWalls.size === nrWalls.size && [...nrWalls].every(w => srWalls.has(w));
+        // Priority 2: preserve identity of previously-detected rooms so
+        // edits to detected-only rooms persist across re-detection passes
+        // within the same session.
+        const existing = detectedRooms.find(old => {
+          const oldWalls = new Set(old.walls);
+          return oldWalls.size === nrWalls.size && [...nrWalls].every(w => oldWalls.has(w));
         });
-        if (saved) {
-          nr.id = saved.id;
-          nr.name = saved.name;
-          if (saved.floorTexture) nr.floorTexture = saved.floorTexture;
+        if (existing) {
+          nr.id = existing.id;
+          nr.name = existing.name;
+          nr.floorTexture = existing.floorTexture;
         }
       }
     }

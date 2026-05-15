@@ -1,4 +1,4 @@
-import { selectedTool, undo, redo, viewMode, selectedElementId, selectedElementIds, removeElement, panMode, beginUndoGroup, endUndoGroup } from '$lib/stores/project';
+import { selectedTool, undo, redo, selectedElementId, selectedElementIds, removeElement, panMode, beginUndoGroup, endUndoGroup } from '$lib/stores/project';
 import { get } from 'svelte/store';
 import { localStore } from '$lib/services/datastore';
 import { currentProject } from '$lib/stores/project';
@@ -65,12 +65,6 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: ShortcutContext = {}
   if (e.key === 't' || e.key === 'T') { selectedTool.set('text'); panMode.set(false); return true; }
   if (e.key === 'r' || e.key === 'R') {
     if (ctx.rotateFurniture) ctx.rotateFurniture();
-    return true;
-  }
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const m = get(viewMode);
-    viewMode.set(m === '2d' ? '3d' : '2d');
     return true;
   }
   if (e.key === 'g' || e.key === 'G') {

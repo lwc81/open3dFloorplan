@@ -2090,13 +2090,22 @@
     const resizeObs = new ResizeObserver(onResize);
     resizeObs.observe(container);
 
+    // Subscribe to rooms FIRST so savedRooms is populated before the initial
+    // rebuildScene() — otherwise the first render falls back to detectRooms()
+    // which produces generic "Room 1" labels instead of the user's names.
+    let lastRoomsSig = '';
+    const unsubRooms = detectedRoomsStore.subscribe((rooms) => {
+      savedRooms = rooms;
+      const sig = rooms.map(r => `${r.id}:${r.name}:${r.floorTexture ?? ''}`).join('|');
+      if (sig !== lastRoomsSig) {
+        lastRoomsSig = sig;
+        if (currentFloor) rebuildScene();
+      }
+    });
+
     const unsub = activeFloor.subscribe((f) => {
       currentFloor = f;
       if (f) rebuildScene();
-    });
-
-    const unsubRooms = detectedRoomsStore.subscribe((rooms) => {
-      savedRooms = rooms;
     });
 
     // Highlight selected wall in 3D

@@ -504,6 +504,7 @@ export function updateProjectName(name: string) {
 export function loadProject(project: Project) {
   undoStack.length = 0;
   redoStack.length = 0;
+  detectedRoomsStore.set([]);
   currentProject.set(project);
   syncHistoryStore();
 }
