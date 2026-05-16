@@ -17,6 +17,14 @@
   import { triggerTip } from '$lib/stores/onboarding.svelte';
 
   let commandPaletteOpen = $state(false);
+  let showBuildPanel = $state(true);
+  const BUILD_PANEL_VISIBILITY_KEY = 'o3d_build_panel_visible';
+  function toggleBuildPanel() {
+    showBuildPanel = !showBuildPanel;
+    try {
+      localStorage.setItem(BUILD_PANEL_VISIBILITY_KEY, showBuildPanel ? 'true' : 'false');
+    } catch {}
+  }
   let printOpen = $state(false);
 
   // Lazy-load ThreeViewer to avoid loading Three.js (~1.4MB) until 3D mode is activated
@@ -45,6 +53,11 @@
 
   onMount(() => {
     (async () => {
+      try {
+        const stored = localStorage.getItem(BUILD_PANEL_VISIBILITY_KEY);
+        if (stored) showBuildPanel = stored !== 'false';
+      } catch {}
+      
       const url = new URL(window.location.href);
       const id = url.searchParams.get('id');
       if (id) {
@@ -77,14 +90,54 @@
   });
 </script>
 
-<svelte:window on:keydown={(e) => { if (e.key === 'p' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); printOpen = true; } if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !e.ctrlKey && !e.metaKey && (e.target as HTMLElement)?.tagName !== 'INPUT' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA')) { e.preventDefault(); commandPaletteOpen = !commandPaletteOpen; } if (e.key === '?' && !e.ctrlKey && !e.metaKey) { showHelp = !showHelp; e.preventDefault(); } if (e.key === 'Escape' && showHelp) { showHelp = false; } if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && (e.target as HTMLElement)?.tagName !== 'INPUT') { showLayers = !showLayers; } if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) { const tag = (e.target as HTMLElement)?.tagName; if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') { e.preventDefault(); viewMode.update(m => m === '2d' ? '3d' : '2d'); } } }} />
+<svelte:window on:keydown={(e) => {
+  const tag = (e.target as HTMLElement)?.tagName;
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+  if (e.key === 'p' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    printOpen = true;
+  }
+  if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !e.ctrlKey && !e.metaKey && !isInput)) {
+    e.preventDefault();
+    commandPaletteOpen = !commandPaletteOpen;
+  }
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+    showHelp = !showHelp;
+    e.preventDefault();
+  }
+  if (e.key === 'Escape' && showHelp) {
+    showHelp = false;
+  }
+  if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !isInput) {
+    showLayers = !showLayers;
+  }
+  if (e.key === 'b' && !e.ctrlKey && !e.metaKey && !e.altKey && !isInput && mode === '2d') {
+    e.preventDefault();
+    toggleBuildPanel();
+  }
+  if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && !isInput) {
+    e.preventDefault();
+    viewMode.update(m => m === '2d' ? '3d' : '2d');
+  }
+}} />
 
 {#if ready}
   <div class="h-screen flex flex-col overflow-hidden">
     <TopBar />
     <div class="flex flex-1 overflow-hidden">
       {#if mode === '2d'}
-        <BuildPanel />
+        <div
+          id="editor-build-panel"
+          class="shrink-0 transition-all duration-300 ease-out overflow-hidden h-full"
+          style="width: {showBuildPanel ? '256px' : '0px'}; opacity: {showBuildPanel ? '1' : '0'}"
+          aria-hidden={!showBuildPanel}
+          inert={!showBuildPanel}
+        >
+          <div class="w-64 h-full shrink-0">
+            <BuildPanel />
+          </div>
+        </div>
       {/if}
       <div class="flex-1 min-w-0 relative">
         {#if mode === '2d'}
@@ -104,6 +157,17 @@
       <PropertiesPanel is3D={mode === '3d'} />
     </div>
   </div>
+
+  {#if mode === '2d'}
+    <button
+      class="fixed top-1/2 -translate-y-1/2 z-50 h-14 w-5 rounded-r-lg border border-l-0 border-gray-200 bg-white/95 text-slate-500 shadow-md backdrop-blur transition-all duration-300 ease-out hover:bg-blue-50 hover:text-blue-600 focus:outline-none"
+      style="left: {showBuildPanel ? '256px' : '0px'}"
+      onclick={toggleBuildPanel}
+      aria-label={showBuildPanel ? 'Collapse Build Panel (B)' : 'Expand Build Panel (B)'}
+      aria-controls="editor-build-panel"
+      aria-expanded={showBuildPanel}
+    >{showBuildPanel ? '‹' : '›'}</button>
+  {/if}
 
   <!-- Layers toggle button -->
   {#if mode === '2d'}
@@ -189,6 +253,7 @@
                   '',
                   '── VIEW ──',
                   'Tab        Toggle 2D/3D',
+                  'B          Toggle build panel',
                   'F          Zoom to fit',
                   'G          Toggle grid',
                   'L          Toggle layers',
@@ -274,6 +339,7 @@
               </div>
               <div class="space-y-1.5 mb-5">
                 <div class="flex justify-between"><span class="text-gray-600">Toggle 2D / 3D</span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-slate-700 border border-gray-200">Tab</kbd></div>
+                <div class="flex justify-between"><span class="text-gray-600">Toggle build panel</span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-slate-700 border border-gray-200">B</kbd></div>
                 <div class="flex justify-between"><span class="text-gray-600">Zoom to fit</span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-slate-700 border border-gray-200">F</kbd></div>
                 <div class="flex justify-between"><span class="text-gray-600">Toggle grid</span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-slate-700 border border-gray-200">G</kbd></div>
                 <div class="flex justify-between"><span class="text-gray-600">Toggle layers</span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono text-slate-700 border border-gray-200">L</kbd></div>
