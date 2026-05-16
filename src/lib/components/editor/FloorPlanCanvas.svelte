@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationMethod, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement } from '$lib/stores/project';
+  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationMethod, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement, backgroundSnapPointMode } from '$lib/stores/project';
   import type { CalibrationMethod } from '$lib/stores/project';
   import type { Point, Wall, Door, Window as Win, FurnitureItem, Stair, Column, GuideLine, Measurement, Annotation, TextAnnotation } from '$lib/models/types';
   import type { Floor, Room } from '$lib/models/types';
@@ -15,8 +15,7 @@
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
   import type { ProjectSettings } from '$lib/stores/settings';
   import type { CanvasState } from '$lib/utils/canvasInteraction';
-  import { detectBackgroundSnapCandidatesForImage, detectBlueprintCalibrationFromClick, detectBlueprintDistanceCm } from '$lib/utils/blueprintScale';
-  import type { BackgroundSnapCandidate } from '$lib/utils/blueprintScale';
+  import { detectBlueprintCalibrationFromClick, detectBlueprintDistanceCm } from '$lib/utils/blueprintScale';
   import { drawWall as _drawWall, drawDoorOnWall as _drawDoorOnWall, drawWindowOnWall as _drawWindowOnWall, drawDoorDistanceDimensions as _drawDoorDistanceDimensions, drawWindowDistanceDimensions as _drawWindowDistanceDimensions, drawFurnitureItem, drawStair as _drawStair, drawColumn as _drawColumn, drawGuides as _drawGuides, drawPersistedMeasurements as _drawPersistedMeasurements, drawTextAnnotations as _drawTextAnnotations, drawAnnotation as _drawAnnotation, drawAnnotations as _drawAnnotations, drawRooms as _drawRooms, drawWallJoints as _drawWallJoints, drawSnapPoints as _drawSnapPoints, drawMinimap as _drawMinimap } from '$lib/utils/canvasRenderer';
   import { pointInPolygon, positionOnWall, findWallAt as _findWallAt, findHandleAt as _findHandleAt, findFurnitureAt as _findFurnitureAt, findColumnAt as _findColumnAt, findStairAt as _findStairAt, findDoorAt as _findDoorAt, findWindowAt as _findWindowAt, findRoomAt as _findRoomAt, hitTestMeasurement as _hitTestMeasurement, hitTestAnnotation as _hitTestAnnotation, hitTestTextAnnotation as _hitTestTextAnnotation } from '$lib/utils/hitTesting';
 
@@ -142,6 +141,7 @@
   let currentSnapToGrid: boolean = $state(true);
   let currentSnapToBackground: boolean = $state(false);
   let currentShowBackgroundSnapPoints: boolean = $state(false);
+  let currentEditingBackgroundSnapPoints: boolean = $state(false);
   let currentGridSize: number = $state(25);
   let isPlacingStair: boolean = $state(false);
   let draggingStairId: string | null = $state(null);
@@ -155,18 +155,17 @@
   let calibrationBusy = $state(false);
   let calPoints: Point[] = $state([]);
   let bgImage: HTMLImageElement | null = $state(null);
-  let bgSnapPoints: BackgroundSnapCandidate[] = $state([]);
-  let bgSnapCandidates: BackgroundSnapCandidate[] = $state([]);
-  let bgSnapActive: BackgroundSnapCandidate | null = $state(null);
-  let bgSnapCacheKey = '';
+  let bgSnapPoints: Point[] = $state([]);
+  let bgSnapCandidates: Point[] = $state([]);
+  let bgSnapActive: Point | null = $state(null);
 
   type MagneticSnapResult = Point & {
     snappedToEndpoint?: boolean;
     snappedToWall?: boolean;
     snappedWallId?: string;
     snappedToBackground?: boolean;
-    backgroundCandidates?: BackgroundSnapCandidate[];
-    backgroundSnapCandidate?: BackgroundSnapCandidate | null;
+    backgroundCandidates?: Point[];
+    backgroundSnapPoint?: Point | null;
   };
 
   // Room label drag state
@@ -435,64 +434,67 @@
     return results;
   }
 
-  function clearBackgroundSnapCache() {
+  function clearBackgroundSnapState() {
     bgSnapPoints = [];
     bgSnapCandidates = [];
     bgSnapActive = null;
-    bgSnapCacheKey = '';
   }
 
-  function getBackgroundSnapCacheKey(backgroundImage: Floor['backgroundImage'] | null | undefined): string {
-    if (!backgroundImage) return '';
-
-    return [
-      backgroundImage.dataUrl.length,
-      backgroundImage.dataUrl.slice(0, 48),
-      backgroundImage.dataUrl.slice(-24),
-      backgroundImage.position.x.toFixed(3),
-      backgroundImage.position.y.toFixed(3),
-      backgroundImage.scale.toFixed(6),
-      backgroundImage.rotation.toFixed(3),
-    ].join('|');
-  }
-
-  function refreshBackgroundSnapPoints(backgroundImage: Floor['backgroundImage'] | null | undefined) {
-    if (!backgroundImage || !bgImage) {
-      clearBackgroundSnapCache();
+  function syncBackgroundSnapPoints(backgroundImage: Floor['backgroundImage'] | null | undefined) {
+    if (!backgroundImage) {
+      clearBackgroundSnapState();
       return;
     }
 
-    const nextKey = getBackgroundSnapCacheKey(backgroundImage);
-    if (bgSnapCacheKey === nextKey) return;
-
-    bgSnapCacheKey = nextKey;
-    bgSnapCandidates = [];
-    bgSnapActive = null;
-
-    try {
-      bgSnapPoints = detectBackgroundSnapCandidatesForImage({
-        image: bgImage,
-        backgroundImage,
-        limit: 400,
+    const nextPoints = (backgroundImage.snapPoints ?? []).map((point) => ({ ...point }));
+    const changed = nextPoints.length !== bgSnapPoints.length
+      || nextPoints.some((point, index) => {
+        const current = bgSnapPoints[index];
+        return !current || Math.hypot(point.x - current.x, point.y - current.y) > 0.001;
       });
-    } catch (error) {
-      console.warn('Failed to precompute background snap points.', error);
-      bgSnapPoints = [];
-    }
 
+    if (!changed) return;
+
+    bgSnapPoints = nextPoints;
+    bgSnapCandidates = bgSnapCandidates.filter((candidate) => nextPoints.some((point) => Math.hypot(point.x - candidate.x, point.y - candidate.y) < 0.1));
+    if (bgSnapActive && !nextPoints.some((point) => Math.hypot(point.x - bgSnapActive!.x, point.y - bgSnapActive!.y) < 0.1)) {
+      bgSnapActive = null;
+    }
     markDirty();
   }
 
-  function getNearbyBackgroundSnapCandidates(point: Point, worldRadius: number, limit = 6): BackgroundSnapCandidate[] {
+  function saveBackgroundSnapPoints(points: Point[]) {
+    if (!currentFloor?.backgroundImage) return;
+    updateBackgroundImage({ snapPoints: points.map((point) => ({ ...point })) });
+  }
+
+  function findNearestBackgroundSnapPoint(point: Point, worldRadius = 12 / zoom): { index: number; point: Point } | null {
+    let bestIndex = -1;
+    let bestDistance = worldRadius;
+
+    for (let index = 0; index < bgSnapPoints.length; index += 1) {
+      const candidate = bgSnapPoints[index];
+      const distance = Math.hypot(point.x - candidate.x, point.y - candidate.y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+
+    if (bestIndex === -1) return null;
+    return { index: bestIndex, point: bgSnapPoints[bestIndex] };
+  }
+
+  function getNearbyBackgroundSnapCandidates(point: Point, worldRadius: number, limit = 6): Point[] {
     if (bgSnapPoints.length === 0) return [];
 
     return bgSnapPoints
       .map((candidate) => ({
         candidate,
-        dist: Math.hypot(point.x - candidate.point.x, point.y - candidate.point.y),
+        dist: Math.hypot(point.x - candidate.x, point.y - candidate.y),
       }))
       .filter((entry) => entry.dist < worldRadius)
-      .sort((a, b) => a.dist - b.dist || b.candidate.score - a.candidate.score)
+      .sort((a, b) => a.dist - b.dist)
       .slice(0, limit)
       .map((entry) => entry.candidate);
   }
@@ -501,7 +503,7 @@
     if (!currentFloor) return { x: snap(p.x), y: snap(p.y) };
     let best: MagneticSnapResult = { x: snap(p.x), y: snap(p.y) };
     let bestDist = MAGNETIC_SNAP / zoom;
-    let backgroundCandidates: BackgroundSnapCandidate[] = [];
+    let backgroundCandidates: Point[] = [];
     // First pass: snap to endpoints (highest priority)
     for (const w of currentFloor.walls) {
       if (excludeWallIds && excludeWallIds.has(w.id)) continue;
@@ -520,14 +522,14 @@
         6,
       );
       for (const candidate of backgroundCandidates) {
-        const d = Math.hypot(p.x - candidate.point.x, p.y - candidate.point.y);
+        const d = Math.hypot(p.x - candidate.x, p.y - candidate.y);
         if (d < bestDist) {
           bestDist = d;
           best = {
-            x: candidate.point.x,
-            y: candidate.point.y,
+            x: candidate.x,
+            y: candidate.y,
             snappedToBackground: true,
-            backgroundSnapCandidate: candidate,
+            backgroundSnapPoint: candidate,
           };
         }
       }
@@ -564,7 +566,7 @@
       return;
     }
     bgSnapCandidates = result?.backgroundCandidates ?? [];
-    bgSnapActive = result?.backgroundSnapCandidate ?? null;
+    bgSnapActive = result?.backgroundSnapPoint ?? null;
   }
 
   function shouldPreviewBackgroundSnap(): boolean {
@@ -999,7 +1001,7 @@
     if (!currentFloor) return;
     _drawSnapPoints(getCS(), currentFloor, showGrid);
 
-    const showPersistentPoints = currentShowBackgroundSnapPoints && currentFloor.backgroundImage && bgSnapPoints.length > 0;
+    const showPersistentPoints = (currentShowBackgroundSnapPoints || currentEditingBackgroundSnapPoints) && currentFloor.backgroundImage && bgSnapPoints.length > 0;
     const showPreviewPoints = shouldPreviewBackgroundSnap() && bgSnapCandidates.length > 0;
     if (!showPersistentPoints && !showPreviewPoints) return;
 
@@ -1007,12 +1009,12 @@
 
     if (showPersistentPoints) {
       for (const candidate of bgSnapPoints) {
-        const s = worldToScreen(candidate.point.x, candidate.point.y);
-        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.point.x - candidate.point.x, bgSnapActive.point.y - candidate.point.y) < 0.1;
-        const size = isActive ? 4.5 : 2.5;
-        ctx.fillStyle = isActive ? 'rgba(6, 182, 212, 0.9)' : 'rgba(6, 182, 212, 0.2)';
-        ctx.strokeStyle = isActive ? 'rgba(15, 23, 42, 0.95)' : 'rgba(8, 47, 73, 0.18)';
-        ctx.lineWidth = isActive ? 1.5 : 0.75;
+        const s = worldToScreen(candidate.x, candidate.y);
+        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.x - candidate.x, bgSnapActive.y - candidate.y) < 0.1;
+        const size = currentEditingBackgroundSnapPoints ? (isActive ? 5.5 : 3.25) : (isActive ? 4.5 : 2.5);
+        ctx.fillStyle = isActive ? 'rgba(6, 182, 212, 0.9)' : currentEditingBackgroundSnapPoints ? 'rgba(6, 182, 212, 0.35)' : 'rgba(6, 182, 212, 0.2)';
+        ctx.strokeStyle = isActive ? 'rgba(15, 23, 42, 0.95)' : currentEditingBackgroundSnapPoints ? 'rgba(8, 47, 73, 0.45)' : 'rgba(8, 47, 73, 0.18)';
+        ctx.lineWidth = isActive ? 1.5 : currentEditingBackgroundSnapPoints ? 1 : 0.75;
         ctx.beginPath();
         ctx.rect(s.x - size, s.y - size, size * 2, size * 2);
         ctx.fill();
@@ -1022,8 +1024,8 @@
 
     if (showPreviewPoints) {
       for (const candidate of bgSnapCandidates) {
-        const s = worldToScreen(candidate.point.x, candidate.point.y);
-        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.point.x - candidate.point.x, bgSnapActive.point.y - candidate.point.y) < 0.1;
+        const s = worldToScreen(candidate.x, candidate.y);
+        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.x - candidate.x, bgSnapActive.y - candidate.y) < 0.1;
         const size = isActive ? 5 : 3.5;
         ctx.fillStyle = isActive ? '#06b6d4' : 'rgba(6, 182, 212, 0.35)';
         ctx.strokeStyle = isActive ? '#0f172a' : 'rgba(8, 47, 73, 0.25)';
@@ -2002,6 +2004,7 @@
     const unsub9 = placingWindowType.subscribe((t) => { currentWindowType = t; markDirty(); });
     const unsub10 = snapEnabled.subscribe((v) => { currentSnapEnabled = v; markDirty(); });
     const unsub_snapgrid = projectSettings.subscribe((s) => { currentSnapToGrid = s.snapToGrid; currentSnapToBackground = s.snapToBackground; currentShowBackgroundSnapPoints = s.showBackgroundSnapPoints; currentGridSize = s.gridSize; markDirty(); });
+    const unsub_bgmode = backgroundSnapPointMode.subscribe((v) => { currentEditingBackgroundSnapPoints = v; markDirty(); });
     const unsub11 = placingStair.subscribe((v) => { isPlacingStair = v; markDirty(); });
     const unsub_layers = layerVisibility.subscribe((v) => { layerVis = v; markDirty(); });
     const unsub_col = placingColumn.subscribe((v) => { isPlacingColumn = v; markDirty(); });
@@ -2017,15 +2020,16 @@
         img.onload = () => {
           if (currentFloor?.backgroundImage?.dataUrl !== dataUrl) return;
           bgImage = img;
-          refreshBackgroundSnapPoints(currentFloor.backgroundImage);
+          syncBackgroundSnapPoints(currentFloor.backgroundImage);
           markDirty();
         };
         img.src = dataUrl;
       } else if (f?.backgroundImage) {
-        refreshBackgroundSnapPoints(f.backgroundImage);
+        syncBackgroundSnapPoints(f.backgroundImage);
       } else if (!f?.backgroundImage) {
         bgImage = null;
-        clearBackgroundSnapCache();
+        clearBackgroundSnapState();
+        backgroundSnapPointMode.set(false);
       }
     });
 
@@ -2055,7 +2059,7 @@
     }
     document.addEventListener('paste', handlePaste);
 
-    return () => { resizeObs.disconnect(); unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); unsub7(); unsub8(); unsub9(); unsub10(); unsub11(); unsub12(); unsub12b(); unsub13(); unsub_multi(); unsub14(); unsub_col(); unsub_cols(); unsub_layers(); unsub_snapgrid(); document.removeEventListener('paste', handlePaste); };
+    return () => { resizeObs.disconnect(); unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); unsub7(); unsub8(); unsub9(); unsub10(); unsub11(); unsub12(); unsub12b(); unsub13(); unsub_multi(); unsub14(); unsub_col(); unsub_cols(); unsub_layers(); unsub_snapgrid(); unsub_bgmode(); document.removeEventListener('paste', handlePaste); };
   });
 
   /** Compute world bounding box of all elements */
@@ -2246,6 +2250,16 @@
     const rect = canvas.getBoundingClientRect();
     const wp = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
     const tool = currentTool;
+
+    if (currentEditingBackgroundSnapPoints && currentFloor?.backgroundImage) {
+      const existingPoint = findNearestBackgroundSnapPoint(wp);
+      if (existingPoint) {
+        saveBackgroundSnapPoints(bgSnapPoints.filter((_, index) => index !== existingPoint.index));
+      } else {
+        saveBackgroundSnapPoints([...bgSnapPoints, { x: wp.x, y: wp.y }]);
+      }
+      return;
+    }
 
     // Text annotation tool: click to place text
     if (textAnnotationMode) {
@@ -2726,7 +2740,10 @@
     const rect = canvas.getBoundingClientRect();
     mousePos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
 
-    if (!shouldPreviewBackgroundSnap()) {
+    if (currentEditingBackgroundSnapPoints) {
+      bgSnapCandidates = [];
+      bgSnapActive = findNearestBackgroundSnapPoint(mousePos)?.point ?? null;
+    } else if (!shouldPreviewBackgroundSnap()) {
       setBackgroundSnapPreview(null);
     } else if (!draggingWallEndpoint) {
       setBackgroundSnapPreview(magneticSnap(mousePos));
@@ -2755,6 +2772,9 @@
       camY -= (e.clientY - panStartY) / zoom;
       panStartX = e.clientX;
       panStartY = e.clientY;
+    }
+    if (currentEditingBackgroundSnapPoints) {
+      return;
     }
     if (draggingWallEndpoint) {
       // Exclude the dragged wall and all connected walls from magnetic snap targets
@@ -3002,6 +3022,10 @@
     isPanning = false;
     draggingGuideId = null;
 
+    if (currentEditingBackgroundSnapPoints) {
+      return;
+    }
+
     // Finalize room label drag
     if (draggingRoomLabelId) {
       const dx = mousePos.x - roomLabelDragStart.x;
@@ -3200,6 +3224,7 @@
       annotationStart = null;
       marqueeStart = null;
       marqueeEnd = null;
+      backgroundSnapPointMode.set(false);
     }
 
     // Select All (Ctrl+A / Cmd+A)
@@ -3875,6 +3900,9 @@
       </button>
       <button class="hover:text-gray-700" onclick={() => projectSettings.update(s => ({ ...s, showBackgroundSnapPoints: !s.showBackgroundSnapPoints }))} title="Toggle Background Snap Points">
         {currentShowBackgroundSnapPoints ? '✳︎' : '·'} BG Points
+      </button>
+      <button class="hover:text-gray-700" onclick={() => { const next = !currentEditingBackgroundSnapPoints; backgroundSnapPointMode.set(next); if (next) projectSettings.update(s => ({ ...s, showBackgroundSnapPoints: true })); }} title="Edit Background Snap Points">
+        {currentEditingBackgroundSnapPoints ? '✍︎' : '+'} BG Edit
       </button>
     {/if}
     <button class="hover:text-gray-700" onclick={() => layerVisibility.update(v => ({ ...v, furniture: !v.furniture }))} title="Toggle Furniture">

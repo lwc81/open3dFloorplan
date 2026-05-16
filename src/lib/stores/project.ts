@@ -378,6 +378,7 @@ export const placingStair = writable<boolean>(false);
 export const calibrationMode = writable<boolean>(false);
 export const calibrationMethod = writable<CalibrationMethod>('points');
 export const calibrationPoints = writable<Point[]>([]);
+export const backgroundSnapPointMode = writable<boolean>(false);
 
 export function removeElement(id: string) {
   mutate((f) => {

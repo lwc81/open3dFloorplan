@@ -10,7 +10,7 @@ export interface ProjectSettings {
   dimensionLineColor: string;            // color for dimension lines/text
   snapToGrid: boolean;                   // snap elements to grid when dragging
   snapToBackground: boolean;             // snap elements to detected background points
-  showBackgroundSnapPoints: boolean;     // show detected background snap points on the canvas
+  showBackgroundSnapPoints: boolean;     // show saved background snap points on the canvas
   gridSize: number;                      // grid snap size in cm (default 25)
 }
 

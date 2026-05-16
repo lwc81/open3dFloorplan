@@ -137,6 +137,7 @@ export interface BackgroundImage {
   opacity: number;
   rotation: number;
   locked: boolean;
+  snapPoints?: Point[];
 }
 
 export interface Floor {

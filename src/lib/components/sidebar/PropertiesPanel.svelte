@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock } from '$lib/stores/project';
+  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock, backgroundSnapPointMode } from '$lib/stores/project';
   import { floorMaterials, wallColors } from '$lib/utils/materials';
   import { getCatalogItem } from '$lib/utils/furnitureCatalog';
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
@@ -17,6 +17,8 @@
 
   let settings = $state($projectSettings);
   projectSettings.subscribe((s) => { settings = s; });
+  let isEditingBackgroundSnapPoints = $state($backgroundSnapPointMode);
+  backgroundSnapPointMode.subscribe((v) => { isEditingBackgroundSnapPoints = v; });
 
   function displayValue(cm: number): number {
     return settings.units === 'imperial' ? Math.round(cm / 2.54 * 10) / 10 : cm;
@@ -920,7 +922,7 @@
         <label class="flex items-center justify-between gap-3 rounded border border-gray-200 px-3 py-2 text-sm text-gray-600">
           <span>
             <span class="block font-medium text-gray-700">Show Snap Points</span>
-            <span class="block text-xs text-gray-400">Display the pre-detected blueprint corners and intersections on the canvas.</span>
+            <span class="block text-xs text-gray-400">Display the saved background snap points on the canvas.</span>
           </span>
           <input
             type="checkbox"
@@ -930,7 +932,18 @@
           />
         </label>
         <button
-          onclick={() => setBackgroundImage(undefined)}
+          onclick={() => {
+            const next = !isEditingBackgroundSnapPoints;
+            backgroundSnapPointMode.set(next);
+            if (next) {
+              projectSettings.update((s) => ({ ...s, showBackgroundSnapPoints: true }));
+            }
+          }}
+          class="w-full px-2 py-1.5 border rounded text-sm {isEditingBackgroundSnapPoints ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-gray-200 hover:bg-gray-50'}"
+        >{isEditingBackgroundSnapPoints ? '✍️ Editing Snap Points' : '✍️ Edit Snap Points'}</button>
+        <p class="text-xs leading-4 text-gray-400">In deze modus klik je op de tekening om snap-punten toe te voegen. Klik op een bestaand punt om het weer te verwijderen. Druk op Escape om de modus te verlaten.</p>
+        <button
+          onclick={() => { backgroundSnapPointMode.set(false); setBackgroundImage(undefined); }}
           class="w-full px-2 py-1.5 border border-red-300 rounded text-sm text-red-600 hover:bg-red-50"
         >Remove Image</button>
       </div>
