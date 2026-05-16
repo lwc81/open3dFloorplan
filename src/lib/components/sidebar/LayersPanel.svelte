@@ -12,11 +12,24 @@
   let vis = $state({ walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true });
   layerVisibility.subscribe(v => { vis = v; });
 
-  // Collapsed state per category
-  let collapsed: Record<string, boolean> = $state({});
+  // Collapsed state per category — persisted across panel toggles + sessions
+  const COLLAPSE_STORAGE_KEY = 'layersPanel.collapsed';
+  function loadCollapsed(): Record<string, boolean> {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+  let collapsed: Record<string, boolean> = $state(loadCollapsed());
 
   function toggle(cat: string) {
     collapsed[cat] = !collapsed[cat];
+    try {
+      localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(collapsed));
+    } catch {}
   }
 
   function toggleVisibility(cat: keyof typeof vis) {
