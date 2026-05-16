@@ -191,13 +191,13 @@
     <!-- Rooms section -->
     <div class="border-b border-gray-50 relative">
       <button
-        class="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-gray-50 text-left"
+        class="w-full flex items-center gap-1.5 pl-2 pr-9 py-1.5 hover:bg-gray-50 text-left"
         onclick={() => toggle('rooms')}
       >
         <span class="text-[10px] text-gray-400 w-3">{collapsed['rooms'] ? '▸' : '▾'}</span>
         <span>🏠</span>
         <span class="font-medium text-gray-700 flex-1">Rooms</span>
-        <span class="text-gray-400 mr-1">{mergedRooms.length}</span>
+        <span class="text-gray-400">{mergedRooms.length}</span>
       </button>
       <span
         role="button"
@@ -249,13 +249,13 @@
       <div class="border-b border-gray-50 relative">
         <!-- Category header -->
         <button
-          class="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-gray-50 text-left"
+          class="w-full flex items-center gap-1.5 pl-2 pr-9 py-1.5 hover:bg-gray-50 text-left"
           onclick={() => toggle(cat.key)}
         >
           <span class="text-[10px] text-gray-400 w-3">{collapsed[cat.key] ? '▸' : '▾'}</span>
           <span>{cat.icon}</span>
           <span class="font-medium text-gray-700 flex-1">{cat.label}</span>
-          <span class="text-gray-400 mr-1">{cat.items.length}</span>
+          <span class="text-gray-400">{cat.items.length}</span>
         </button>
         <!-- Visibility toggle (outside button to avoid nesting) -->
         <span
