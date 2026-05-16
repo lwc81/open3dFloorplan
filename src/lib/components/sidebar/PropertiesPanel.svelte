@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationPoints, updateTextAnnotation, toggleFurnitureLock } from '$lib/stores/project';
+  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock } from '$lib/stores/project';
   import { floorMaterials, wallColors } from '$lib/utils/materials';
   import { getCatalogItem } from '$lib/utils/furnitureCatalog';
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
@@ -890,16 +890,45 @@
           <span class="text-xs text-gray-500">Rotation</span>
           <input type="number" value={floor.backgroundImage.rotation} oninput={(e) => updateBackgroundImage({ rotation: Number((e.target as HTMLInputElement).value) })} class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
         </label>
-        <div class="flex gap-2">
+        <button
+          onclick={() => updateBackgroundImage({ locked: !floor!.backgroundImage!.locked })}
+          class="w-full px-2 py-1.5 border rounded text-sm {floor.backgroundImage.locked ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-gray-200 hover:bg-gray-50'}"
+        >{floor.backgroundImage.locked ? '🔒 Locked' : '🔓 Unlocked'}</button>
+        <div class="grid grid-cols-2 gap-2">
           <button
-            onclick={() => updateBackgroundImage({ locked: !floor!.backgroundImage!.locked })}
-            class="flex-1 px-2 py-1.5 border rounded text-sm {floor.backgroundImage.locked ? 'bg-amber-100 border-amber-400 text-amber-700' : 'border-gray-200 hover:bg-gray-50'}"
-          >{floor.backgroundImage.locked ? '🔒 Locked' : '🔓 Unlocked'}</button>
+            onclick={() => { calibrationMethod.set('points'); calibrationPoints.set([]); calibrationMode.set(true); }}
+            class="px-2 py-1.5 border rounded text-sm border-gray-200 hover:bg-gray-50"
+          >📏 2 Points</button>
           <button
-            onclick={() => { calibrationPoints.set([]); calibrationMode.set(true); }}
-            class="flex-1 px-2 py-1.5 border rounded text-sm border-gray-200 hover:bg-gray-50"
-          >📏 Set Scale</button>
+            onclick={() => { calibrationMethod.set('auto'); calibrationPoints.set([]); calibrationMode.set(true); }}
+            class="px-2 py-1.5 border rounded text-sm border-blue-200 text-blue-700 hover:bg-blue-50"
+          >🧭 Auto Detect</button>
         </div>
+        <p class="text-xs leading-4 text-gray-400">2 Points: click both ends of a printed dimension line. Auto Detect: click the printed dimension label or its dimension line once and the app tries to calibrate immediately.</p>
+        <label class="flex items-center justify-between gap-3 rounded border border-gray-200 px-3 py-2 text-sm text-gray-600">
+          <span>
+            <span class="block font-medium text-gray-700">Snap To Background</span>
+            <span class="block text-xs text-gray-400">Snap wall starts, ends, and corners to detected points on the blueprint.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.snapToBackground}
+            onchange={(e) => projectSettings.update((s) => ({ ...s, snapToBackground: (e.target as HTMLInputElement).checked }))}
+            class="accent-blue-600"
+          />
+        </label>
+        <label class="flex items-center justify-between gap-3 rounded border border-gray-200 px-3 py-2 text-sm text-gray-600">
+          <span>
+            <span class="block font-medium text-gray-700">Show Snap Points</span>
+            <span class="block text-xs text-gray-400">Display the pre-detected blueprint corners and intersections on the canvas.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={settings.showBackgroundSnapPoints}
+            onchange={(e) => projectSettings.update((s) => ({ ...s, showBackgroundSnapPoints: (e.target as HTMLInputElement).checked }))}
+            class="accent-blue-600"
+          />
+        </label>
         <button
           onclick={() => setBackgroundImage(undefined)}
           class="w-full px-2 py-1.5 border border-red-300 rounded text-sm text-red-600 hover:bg-red-50"

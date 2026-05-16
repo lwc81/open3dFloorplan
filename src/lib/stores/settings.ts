@@ -9,6 +9,8 @@ export interface ProjectSettings {
   showObjectDistance: boolean;            // distance from objects to walls
   dimensionLineColor: string;            // color for dimension lines/text
   snapToGrid: boolean;                   // snap elements to grid when dragging
+  snapToBackground: boolean;             // snap elements to detected background points
+  showBackgroundSnapPoints: boolean;     // show detected background snap points on the canvas
   gridSize: number;                      // grid snap size in cm (default 25)
 }
 
@@ -21,6 +23,8 @@ const defaultSettings: ProjectSettings = {
   showObjectDistance: true,
   dimensionLineColor: '#1e293b',
   snapToGrid: true,
+  snapToBackground: false,
+  showBackgroundSnapPoints: false,
   gridSize: 25,
 };
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement } from '$lib/stores/project';
+  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationMethod, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement } from '$lib/stores/project';
+  import type { CalibrationMethod } from '$lib/stores/project';
   import type { Point, Wall, Door, Window as Win, FurnitureItem, Stair, Column, GuideLine, Measurement, Annotation, TextAnnotation } from '$lib/models/types';
   import type { Floor, Room } from '$lib/models/types';
   import { detectRooms, getRoomPolygon, roomCentroid } from '$lib/utils/roomDetection';
@@ -14,6 +15,8 @@
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
   import type { ProjectSettings } from '$lib/stores/settings';
   import type { CanvasState } from '$lib/utils/canvasInteraction';
+  import { detectBackgroundSnapCandidatesForImage, detectBlueprintCalibrationFromClick, detectBlueprintDistanceCm } from '$lib/utils/blueprintScale';
+  import type { BackgroundSnapCandidate } from '$lib/utils/blueprintScale';
   import { drawWall as _drawWall, drawDoorOnWall as _drawDoorOnWall, drawWindowOnWall as _drawWindowOnWall, drawDoorDistanceDimensions as _drawDoorDistanceDimensions, drawWindowDistanceDimensions as _drawWindowDistanceDimensions, drawFurnitureItem, drawStair as _drawStair, drawColumn as _drawColumn, drawGuides as _drawGuides, drawPersistedMeasurements as _drawPersistedMeasurements, drawTextAnnotations as _drawTextAnnotations, drawAnnotation as _drawAnnotation, drawAnnotations as _drawAnnotations, drawRooms as _drawRooms, drawWallJoints as _drawWallJoints, drawSnapPoints as _drawSnapPoints, drawMinimap as _drawMinimap } from '$lib/utils/canvasRenderer';
   import { pointInPolygon, positionOnWall, findWallAt as _findWallAt, findHandleAt as _findHandleAt, findFurnitureAt as _findFurnitureAt, findColumnAt as _findColumnAt, findStairAt as _findStairAt, findDoorAt as _findDoorAt, findWindowAt as _findWindowAt, findRoomAt as _findRoomAt, hitTestMeasurement as _hitTestMeasurement, hitTestAnnotation as _hitTestAnnotation, hitTestTextAnnotation as _hitTestTextAnnotation } from '$lib/utils/hitTesting';
 
@@ -105,7 +108,7 @@
     units: 'metric', showDimensions: true, showExternalDimensions: true,
     showInternalDimensions: false, showExtensionLines: true,
     showObjectDistance: true, dimensionLineColor: '#1e293b',
-    snapToGrid: true, gridSize: 25,
+    snapToGrid: true, snapToBackground: false, showBackgroundSnapPoints: false, gridSize: 25,
   });
   projectSettings.subscribe((s) => {
     dimSettings = s;
@@ -137,6 +140,8 @@
   let currentWindowType: Win['type'] = $state('standard');
   let currentSnapEnabled: boolean = $state(true);
   let currentSnapToGrid: boolean = $state(true);
+  let currentSnapToBackground: boolean = $state(false);
+  let currentShowBackgroundSnapPoints: boolean = $state(false);
   let currentGridSize: number = $state(25);
   let isPlacingStair: boolean = $state(false);
   let draggingStairId: string | null = $state(null);
@@ -146,8 +151,23 @@
   let draggingColumnId: string | null = $state(null);
   let columnDragOffset: Point = { x: 0, y: 0 };
   let isCalibrating: boolean = $state(false);
+  let currentCalibrationMethod: CalibrationMethod = $state('points');
+  let calibrationBusy = $state(false);
   let calPoints: Point[] = $state([]);
   let bgImage: HTMLImageElement | null = $state(null);
+  let bgSnapPoints: BackgroundSnapCandidate[] = $state([]);
+  let bgSnapCandidates: BackgroundSnapCandidate[] = $state([]);
+  let bgSnapActive: BackgroundSnapCandidate | null = $state(null);
+  let bgSnapCacheKey = '';
+
+  type MagneticSnapResult = Point & {
+    snappedToEndpoint?: boolean;
+    snappedToWall?: boolean;
+    snappedWallId?: string;
+    snappedToBackground?: boolean;
+    backgroundCandidates?: BackgroundSnapCandidate[];
+    backgroundSnapCandidate?: BackgroundSnapCandidate | null;
+  };
 
   // Room label drag state
   let draggingRoomLabelId: string | null = $state(null);
@@ -311,6 +331,93 @@
     return { x: (wx - camX) * zoom + width / 2, y: (wy - camY) * zoom + height / 2 };
   }
 
+  function resetCalibrationState() {
+    calibrationPoints.set([]);
+    calibrationMode.set(false);
+  }
+
+  function applyCalibrationScale(points: [Point, Point], realDistCm: number) {
+    const dist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (dist <= 0 || !currentFloor?.backgroundImage) return;
+
+    const pixelsPerCm = dist / realDistCm;
+    updateBackgroundImage({ scale: currentFloor.backgroundImage.scale * (1 / pixelsPerCm) });
+  }
+
+  async function finishCalibration(
+    points: [Point, Point],
+    options: { detectedDistanceCm?: number | null; promptForAdjustment?: boolean; tryOcr?: boolean } = {}
+  ) {
+    calibrationPoints.set(points);
+
+    const dist = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (dist <= 0) {
+      resetCalibrationState();
+      return;
+    }
+
+    let detectedDistanceCm = options.detectedDistanceCm ?? null;
+    if (detectedDistanceCm === null && (options.tryOcr ?? true) && currentFloor?.backgroundImage && bgImage) {
+      try {
+        detectedDistanceCm = await detectBlueprintDistanceCm({
+          image: bgImage,
+          backgroundImage: currentFloor.backgroundImage,
+          points,
+        });
+      } catch (error) {
+        console.warn('Failed to read blueprint dimension from background image.', error);
+      }
+    }
+
+    if (detectedDistanceCm !== null && options.promptForAdjustment === false) {
+      applyCalibrationScale(points, detectedDistanceCm);
+      resetCalibrationState();
+      return;
+    }
+
+    const defaultDistance = detectedDistanceCm ? String(Math.round(detectedDistanceCm * 10) / 10) : '';
+    const realDist = prompt(
+      detectedDistanceCm
+        ? 'Detected a drawing dimension from the background image (cm, converted from mm when needed). Adjust if needed before applying scale:'
+        : 'Enter the real-world distance between these two points (in cm):',
+      defaultDistance
+    );
+    const realDistCm = Number(realDist);
+
+    if (realDist && realDistCm > 0) {
+      applyCalibrationScale(points, realDistCm);
+    }
+    resetCalibrationState();
+  }
+
+  async function runAutoCalibrationFromClick(point: Point) {
+    if (!currentFloor?.backgroundImage || !bgImage || calibrationBusy) return;
+
+    calibrationBusy = true;
+    try {
+      const detected = await detectBlueprintCalibrationFromClick({
+        image: bgImage,
+        backgroundImage: currentFloor.backgroundImage,
+        point,
+      });
+      if (!detected) {
+        alert('Could not auto-detect a printed dimension near that click. Click closer to a dimension label or line, or use 2-point calibration.');
+        return;
+      }
+
+      await finishCalibration(detected.points, {
+        detectedDistanceCm: detected.distanceCm,
+        promptForAdjustment: detected.distanceCm === null,
+        tryOcr: detected.distanceCm === null,
+      });
+    } catch (error) {
+      console.warn('Auto calibration from blueprint failed.', error);
+      alert('Auto-detect failed. Try clicking closer to a printed dimension label or line, or use 2-point calibration.');
+    } finally {
+      calibrationBusy = false;
+    }
+  }
+
   /** Find all other wall endpoints that share the same point (within tolerance) */
   function findConnectedEndpoints(pt: Point, excludeWallId: string): { wallId: string; endpoint: 'start' | 'end' }[] {
     const tolerance = 2;
@@ -328,10 +435,73 @@
     return results;
   }
 
-  function magneticSnap(p: Point, excludeWallIds?: Set<string>): Point & { snappedToEndpoint?: boolean; snappedToWall?: boolean; snappedWallId?: string } {
+  function clearBackgroundSnapCache() {
+    bgSnapPoints = [];
+    bgSnapCandidates = [];
+    bgSnapActive = null;
+    bgSnapCacheKey = '';
+  }
+
+  function getBackgroundSnapCacheKey(backgroundImage: Floor['backgroundImage'] | null | undefined): string {
+    if (!backgroundImage) return '';
+
+    return [
+      backgroundImage.dataUrl.length,
+      backgroundImage.dataUrl.slice(0, 48),
+      backgroundImage.dataUrl.slice(-24),
+      backgroundImage.position.x.toFixed(3),
+      backgroundImage.position.y.toFixed(3),
+      backgroundImage.scale.toFixed(6),
+      backgroundImage.rotation.toFixed(3),
+    ].join('|');
+  }
+
+  function refreshBackgroundSnapPoints(backgroundImage: Floor['backgroundImage'] | null | undefined) {
+    if (!backgroundImage || !bgImage) {
+      clearBackgroundSnapCache();
+      return;
+    }
+
+    const nextKey = getBackgroundSnapCacheKey(backgroundImage);
+    if (bgSnapCacheKey === nextKey) return;
+
+    bgSnapCacheKey = nextKey;
+    bgSnapCandidates = [];
+    bgSnapActive = null;
+
+    try {
+      bgSnapPoints = detectBackgroundSnapCandidatesForImage({
+        image: bgImage,
+        backgroundImage,
+        limit: 400,
+      });
+    } catch (error) {
+      console.warn('Failed to precompute background snap points.', error);
+      bgSnapPoints = [];
+    }
+
+    markDirty();
+  }
+
+  function getNearbyBackgroundSnapCandidates(point: Point, worldRadius: number, limit = 6): BackgroundSnapCandidate[] {
+    if (bgSnapPoints.length === 0) return [];
+
+    return bgSnapPoints
+      .map((candidate) => ({
+        candidate,
+        dist: Math.hypot(point.x - candidate.point.x, point.y - candidate.point.y),
+      }))
+      .filter((entry) => entry.dist < worldRadius)
+      .sort((a, b) => a.dist - b.dist || b.candidate.score - a.candidate.score)
+      .slice(0, limit)
+      .map((entry) => entry.candidate);
+  }
+
+  function magneticSnap(p: Point, excludeWallIds?: Set<string>): MagneticSnapResult {
     if (!currentFloor) return { x: snap(p.x), y: snap(p.y) };
-    let best: Point & { snappedToEndpoint?: boolean; snappedToWall?: boolean; snappedWallId?: string } = { x: snap(p.x), y: snap(p.y) };
+    let best: MagneticSnapResult = { x: snap(p.x), y: snap(p.y) };
     let bestDist = MAGNETIC_SNAP / zoom;
+    let backgroundCandidates: BackgroundSnapCandidate[] = [];
     // First pass: snap to endpoints (highest priority)
     for (const w of currentFloor.walls) {
       if (excludeWallIds && excludeWallIds.has(w.id)) continue;
@@ -343,8 +513,27 @@
         }
       }
     }
+    if (!best.snappedToEndpoint && currentSnapEnabled && currentSnapToBackground && currentFloor.backgroundImage) {
+      backgroundCandidates = getNearbyBackgroundSnapCandidates(
+        p,
+        Math.max(bestDist, (MAGNETIC_SNAP + 8) / zoom),
+        6,
+      );
+      for (const candidate of backgroundCandidates) {
+        const d = Math.hypot(p.x - candidate.point.x, p.y - candidate.point.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = {
+            x: candidate.point.x,
+            y: candidate.point.y,
+            snappedToBackground: true,
+            backgroundSnapCandidate: candidate,
+          };
+        }
+      }
+    }
     // Second pass: snap to nearest point on wall segments (lower priority, only if no endpoint snap)
-    if (!best.snappedToEndpoint) {
+    if (!best.snappedToEndpoint && !best.snappedToBackground) {
       const wallSnapThreshold = (MAGNETIC_SNAP + 10) / zoom;
       let bestWallDist = wallSnapThreshold;
       for (const w of currentFloor.walls) {
@@ -365,7 +554,21 @@
         }
       }
     }
-    return best;
+    return { ...best, backgroundCandidates };
+  }
+
+  function setBackgroundSnapPreview(result: MagneticSnapResult | null) {
+    if (!currentSnapToBackground || !currentFloor?.backgroundImage || bgSnapPoints.length === 0) {
+      bgSnapCandidates = [];
+      bgSnapActive = null;
+      return;
+    }
+    bgSnapCandidates = result?.backgroundCandidates ?? [];
+    bgSnapActive = result?.backgroundSnapCandidate ?? null;
+  }
+
+  function shouldPreviewBackgroundSnap(): boolean {
+    return !!(currentSnapToBackground && currentFloor?.backgroundImage && bgSnapPoints.length > 0 && !calibrationBusy && (currentTool === 'wall' || annotating || draggingWallEndpoint));
   }
 
   function angleSnap(start: Point, end: Point): Point {
@@ -795,6 +998,43 @@
   function drawSnapPoints() {
     if (!currentFloor) return;
     _drawSnapPoints(getCS(), currentFloor, showGrid);
+
+    const showPersistentPoints = currentShowBackgroundSnapPoints && currentFloor.backgroundImage && bgSnapPoints.length > 0;
+    const showPreviewPoints = shouldPreviewBackgroundSnap() && bgSnapCandidates.length > 0;
+    if (!showPersistentPoints && !showPreviewPoints) return;
+
+    ctx.save();
+
+    if (showPersistentPoints) {
+      for (const candidate of bgSnapPoints) {
+        const s = worldToScreen(candidate.point.x, candidate.point.y);
+        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.point.x - candidate.point.x, bgSnapActive.point.y - candidate.point.y) < 0.1;
+        const size = isActive ? 4.5 : 2.5;
+        ctx.fillStyle = isActive ? 'rgba(6, 182, 212, 0.9)' : 'rgba(6, 182, 212, 0.2)';
+        ctx.strokeStyle = isActive ? 'rgba(15, 23, 42, 0.95)' : 'rgba(8, 47, 73, 0.18)';
+        ctx.lineWidth = isActive ? 1.5 : 0.75;
+        ctx.beginPath();
+        ctx.rect(s.x - size, s.y - size, size * 2, size * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    if (showPreviewPoints) {
+      for (const candidate of bgSnapCandidates) {
+        const s = worldToScreen(candidate.point.x, candidate.point.y);
+        const isActive = !!bgSnapActive && Math.hypot(bgSnapActive.point.x - candidate.point.x, bgSnapActive.point.y - candidate.point.y) < 0.1;
+        const size = isActive ? 5 : 3.5;
+        ctx.fillStyle = isActive ? '#06b6d4' : 'rgba(6, 182, 212, 0.35)';
+        ctx.strokeStyle = isActive ? '#0f172a' : 'rgba(8, 47, 73, 0.25)';
+        ctx.lineWidth = isActive ? 1.5 : 1;
+        ctx.beginPath();
+        ctx.rect(s.x - size, s.y - size, size * 2, size * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   function drawRooms() {
@@ -1461,7 +1701,8 @@
     }
     if (wallStart && currentTool === 'wall') {
       drawAngleGuides(wallStart);
-      let endPt = magneticSnap(mousePos);
+      const snapResult = magneticSnap(mousePos);
+      let endPt = snapResult;
       if (shiftDown) {
         // Force strict angle snap when Shift is held (0°, 45°, 90°, 135°, 180°)
         const sdx = endPt.x - wallStart.x;
@@ -1760,21 +2001,31 @@
     const unsub8 = placingDoorType.subscribe((t) => { currentDoorType = t; markDirty(); });
     const unsub9 = placingWindowType.subscribe((t) => { currentWindowType = t; markDirty(); });
     const unsub10 = snapEnabled.subscribe((v) => { currentSnapEnabled = v; markDirty(); });
-    const unsub_snapgrid = projectSettings.subscribe((s) => { currentSnapToGrid = s.snapToGrid; currentGridSize = s.gridSize; markDirty(); });
+    const unsub_snapgrid = projectSettings.subscribe((s) => { currentSnapToGrid = s.snapToGrid; currentSnapToBackground = s.snapToBackground; currentShowBackgroundSnapPoints = s.showBackgroundSnapPoints; currentGridSize = s.gridSize; markDirty(); });
     const unsub11 = placingStair.subscribe((v) => { isPlacingStair = v; markDirty(); });
     const unsub_layers = layerVisibility.subscribe((v) => { layerVis = v; markDirty(); });
     const unsub_col = placingColumn.subscribe((v) => { isPlacingColumn = v; markDirty(); });
     const unsub_cols = placingColumnShape.subscribe((v) => { placingColShape = v; markDirty(); });
     const unsub12 = calibrationMode.subscribe((v) => { isCalibrating = v; markDirty(); });
+    const unsub12b = calibrationMethod.subscribe((v) => { currentCalibrationMethod = v; markDirty(); });
     const unsub13 = calibrationPoints.subscribe((pts) => { calPoints = pts; markDirty(); });
     const unsub_multi = selectedElementIds.subscribe((ids) => { currentSelectedIds = ids; markDirty(); });
     const unsub14 = activeFloor.subscribe((f) => {
       if (f?.backgroundImage?.dataUrl && (!bgImage || bgImage.src !== f.backgroundImage.dataUrl)) {
+        const dataUrl = f.backgroundImage.dataUrl;
         const img = new Image();
-        img.onload = () => { bgImage = img; };
-        img.src = f.backgroundImage.dataUrl;
+        img.onload = () => {
+          if (currentFloor?.backgroundImage?.dataUrl !== dataUrl) return;
+          bgImage = img;
+          refreshBackgroundSnapPoints(currentFloor.backgroundImage);
+          markDirty();
+        };
+        img.src = dataUrl;
+      } else if (f?.backgroundImage) {
+        refreshBackgroundSnapPoints(f.backgroundImage);
       } else if (!f?.backgroundImage) {
         bgImage = null;
+        clearBackgroundSnapCache();
       }
     });
 
@@ -1804,7 +2055,7 @@
     }
     document.addEventListener('paste', handlePaste);
 
-    return () => { resizeObs.disconnect(); unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); unsub7(); unsub8(); unsub9(); unsub10(); unsub11(); unsub12(); unsub13(); unsub_multi(); unsub14(); unsub_col(); unsub_cols(); unsub_layers(); unsub_snapgrid(); document.removeEventListener('paste', handlePaste); };
+    return () => { resizeObs.disconnect(); unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6(); unsub7(); unsub8(); unsub9(); unsub10(); unsub11(); unsub12(); unsub12b(); unsub13(); unsub_multi(); unsub14(); unsub_col(); unsub_cols(); unsub_layers(); unsub_snapgrid(); document.removeEventListener('paste', handlePaste); };
   });
 
   /** Compute world bounding box of all elements */
@@ -2128,22 +2379,15 @@
 
     // Calibration mode click
     if (isCalibrating) {
-      calibrationPoints.update(pts => {
-        const newPts = [...pts, { x: wp.x, y: wp.y }];
-        if (newPts.length >= 2) {
-          const dist = Math.hypot(newPts[1].x - newPts[0].x, newPts[1].y - newPts[0].y);
-          const realDist = prompt('Enter the real-world distance between these two points (in cm):');
-          if (realDist && Number(realDist) > 0) {
-            const pixelsPerCm = dist / Number(realDist);
-            if (currentFloor?.backgroundImage) {
-              updateBackgroundImage({ scale: currentFloor.backgroundImage.scale * (1 / pixelsPerCm) });
-            }
-          }
-          calibrationMode.set(false);
-          return [];
-        }
-        return newPts;
-      });
+      if (currentCalibrationMethod === 'auto') {
+        void runAutoCalibrationFromClick({ x: wp.x, y: wp.y });
+        return;
+      }
+      const newPts: [Point, Point] | Point[] = [...calPoints, { x: wp.x, y: wp.y }];
+      calibrationPoints.set(newPts);
+      if (newPts.length >= 2) {
+        void finishCalibration([newPts[0], newPts[1]]);
+      }
       return;
     }
 
@@ -2162,7 +2406,8 @@
     }
 
     if (tool === 'wall') {
-      let endPt = magneticSnap(wp);
+      const snapResult = magneticSnap(wp);
+      let endPt = snapResult;
       if (wallStart) {
         if (shiftDown) {
           const sdx = endPt.x - wallStart.x;
@@ -2176,7 +2421,9 @@
             endPt = { x: wallStart.x + slen * Math.cos(bestAngle), y: wallStart.y + slen * Math.sin(bestAngle) };
           }
         } else {
-          endPt = angleSnap(wallStart, endPt);
+          if (!snapResult.snappedToEndpoint && !snapResult.snappedToBackground) {
+            endPt = angleSnap(wallStart, endPt);
+          }
         }
       }
       if (!wallStart) {
@@ -2479,6 +2726,12 @@
     const rect = canvas.getBoundingClientRect();
     mousePos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
 
+    if (!shouldPreviewBackgroundSnap()) {
+      setBackgroundSnapPreview(null);
+    } else if (!draggingWallEndpoint) {
+      setBackgroundSnapPreview(magneticSnap(mousePos));
+    }
+
     // Drag room label
     if (draggingRoomLabelId) {
       const dx = mousePos.x - roomLabelDragStart.x;
@@ -2506,13 +2759,17 @@
     if (draggingWallEndpoint) {
       // Exclude the dragged wall and all connected walls from magnetic snap targets
       const excludeIds = new Set<string>([draggingWallEndpoint.wallId, ...draggingConnectedEndpoints.map(c => c.wallId)]);
-      let pt = magneticSnap(mousePos, excludeIds);
+      const snapResult = magneticSnap(mousePos, excludeIds);
+      setBackgroundSnapPreview(snapResult);
+      let pt = snapResult;
       // Angle snap to the opposite endpoint of the primary wall being dragged
       if (currentFloor) {
         const wall = currentFloor.walls.find(w => w.id === draggingWallEndpoint!.wallId);
         if (wall) {
           const other = draggingWallEndpoint.endpoint === 'start' ? wall.end : wall.start;
-          pt = angleSnap(other, pt);
+          if (!snapResult.snappedToEndpoint && !snapResult.snappedToBackground) {
+            pt = angleSnap(other, pt);
+          }
         }
       }
       moveWallEndpoint(draggingWallEndpoint.wallId, draggingWallEndpoint.endpoint, pt);
@@ -3427,6 +3684,7 @@
 
   let cursorStyle = $derived(
     spaceDown || isPanning || $panMode || (shiftDown && currentTool === 'select') ? 'grab' :
+    isCalibrating || calibrationBusy ? 'crosshair' :
     draggingFurnitureId ? 'move' :
     draggingRoomId ? 'move' :
     draggingMultiSelect ? 'move' :
@@ -3469,6 +3727,22 @@
     ondragleave={onDragLeave}
     ondrop={onDrop}
   ></canvas>
+  {#if isCalibrating}
+    <div class="absolute top-3 left-3 z-20 rounded-lg border border-blue-200 bg-white/95 px-3 py-2 text-xs text-gray-600 shadow-lg pointer-events-none">
+      <div class="font-semibold text-gray-700">{currentCalibrationMethod === 'auto' ? 'Auto Scale Detection' : '2-Point Scale Calibration'}</div>
+      <div>
+        {#if calibrationBusy}
+          Reading blueprint dimensions...
+        {:else if currentCalibrationMethod === 'auto'}
+          Click a printed dimension label or its line once.
+        {:else if calPoints.length === 0}
+          Click the first endpoint of the printed dimension line.
+        {:else}
+          Click the second endpoint of the printed dimension line.
+        {/if}
+      </div>
+    </div>
+  {/if}
   <!-- Inline room name editor -->
   {#if editingRoomId}
     <input
@@ -3595,6 +3869,14 @@
     <button class="hover:text-gray-700" onclick={() => projectSettings.update(s => ({ ...s, snapToGrid: !s.snapToGrid }))} title="Toggle Snap to Grid (S)">
       {currentSnapToGrid ? '🧲' : '↔'} Snap
     </button>
+    {#if currentFloor?.backgroundImage}
+      <button class="hover:text-gray-700" onclick={() => projectSettings.update(s => ({ ...s, snapToBackground: !s.snapToBackground }))} title="Toggle Snap to Background">
+        {currentSnapToBackground ? '🖼' : '◻'} BG Snap
+      </button>
+      <button class="hover:text-gray-700" onclick={() => projectSettings.update(s => ({ ...s, showBackgroundSnapPoints: !s.showBackgroundSnapPoints }))} title="Toggle Background Snap Points">
+        {currentShowBackgroundSnapPoints ? '✳︎' : '·'} BG Points
+      </button>
+    {/if}
     <button class="hover:text-gray-700" onclick={() => layerVisibility.update(v => ({ ...v, furniture: !v.furniture }))} title="Toggle Furniture">
       {showFurniture ? '🪑' : '👻'} Furniture
     </button>

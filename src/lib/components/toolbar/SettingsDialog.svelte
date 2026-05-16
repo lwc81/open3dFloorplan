@@ -95,6 +95,8 @@
     showObjectDistance: true,
     dimensionLineColor: '#1e293b',
     snapToGrid: true,
+    snapToBackground: false,
+    showBackgroundSnapPoints: false,
     gridSize: 25,
   });
 

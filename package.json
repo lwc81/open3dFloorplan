@@ -36,6 +36,7 @@
 	"dependencies": {
 		"dxf-writer": "^1.18.4",
 		"jspdf": "^4.1.0",
-		"jszip": "^3.10.1"
+		"jszip": "^3.10.1",
+		"tesseract.js": "^7.0.0"
 	}
 }

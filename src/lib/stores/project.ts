@@ -31,6 +31,7 @@ export const activeFloor = derived(currentProject, ($p) => {
 });
 
 export type Tool = 'select' | 'wall' | 'door' | 'window' | 'furniture' | 'text';
+export type CalibrationMethod = 'points' | 'auto';
 export const selectedTool = writable<Tool>('select');
 export const snapEnabled = writable<boolean>(true);
 /** When true, left-click drag pans the canvas instead of selecting */
@@ -375,6 +376,7 @@ export const placingStair = writable<boolean>(false);
 
 /** Scale calibration mode */
 export const calibrationMode = writable<boolean>(false);
+export const calibrationMethod = writable<CalibrationMethod>('points');
 export const calibrationPoints = writable<Point[]>([]);
 
 export function removeElement(id: string) {
