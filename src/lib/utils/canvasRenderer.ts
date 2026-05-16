@@ -1369,6 +1369,53 @@ export function drawRoomFloorPattern(cs: CanvasState, room: Room, screenPoly: { 
   ctx.restore();
 }
 
+// Offsets a simple polygon inward by `d` world units. Each edge is shifted
+// along its inward normal, and adjacent shifted edges are intersected to
+// produce new vertices. Returns [] if the offset collapses the polygon.
+function offsetPolygonInward(poly: Point[], d: number): Point[] {
+  const n = poly.length;
+  if (n < 3 || d <= 0) return poly;
+
+  let signed = 0;
+  for (let i = 0; i < n; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % n];
+    signed += a.x * b.y - b.x * a.y;
+  }
+  // World coords use Y-down (screen-aligned). signed > 0 means CW visually.
+  const cw = signed > 0;
+
+  const edges: { ox: number; oy: number; dx: number; dy: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % n];
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const len = Math.hypot(ex, ey);
+    if (len < 1e-6) { edges.push({ ox: a.x, oy: a.y, dx: ex, dy: ey }); continue; }
+    // Inward normal: for CW polygon (Y-down) rotate edge +90° → (-ey, ex); else (ey, -ex).
+    const nx = (cw ? -ey : ey) / len;
+    const ny = (cw ? ex : -ex) / len;
+    edges.push({ ox: a.x + nx * d, oy: a.y + ny * d, dx: ex, dy: ey });
+  }
+
+  const out: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = edges[(i - 1 + n) % n];
+    const curr = edges[i];
+    const denom = prev.dx * curr.dy - prev.dy * curr.dx;
+    if (Math.abs(denom) < 1e-6) {
+      out.push({ x: curr.ox, y: curr.oy });
+    } else {
+      const sx = curr.ox - prev.ox;
+      const sy = curr.oy - prev.oy;
+      const t = (sx * curr.dy - sy * curr.dx) / denom;
+      out.push({ x: prev.ox + t * prev.dx, y: prev.oy + t * prev.dy });
+    }
+  }
+  return out;
+}
+
 export function drawRooms(
   cs: CanvasState,
   floor: Floor,
@@ -1394,7 +1441,23 @@ export function drawRooms(
 
     const isSelected = currentSelectedRoomId === room.id;
     if (isSelected) {
-      ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
+      // Offset the outline inward so the highlight sits on the room-side of the walls,
+      // not on the wall centerline (where it would be hidden by the walls drawn afterwards).
+      const roomWallIds = new Set(room.walls ?? []);
+      let maxThickness = 0;
+      for (const w of floor.walls) {
+        if (roomWallIds.has(w.id) && w.thickness > maxThickness) maxThickness = w.thickness;
+      }
+      const offsetWorld = (maxThickness > 0 ? maxThickness / 2 : 5) + 3;
+      const inner = offsetPolygonInward(poly, offsetWorld);
+      if (inner.length >= 3) {
+        const screenInner = inner.map(p => wts(cs, p.x, p.y));
+        ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(screenInner[0].x, screenInner[0].y);
+        for (let i = 1; i < screenInner.length; i++) ctx.lineTo(screenInner[i].x, screenInner[i].y);
+        ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+      }
     }
 
     const centroid = roomCentroid(poly);
