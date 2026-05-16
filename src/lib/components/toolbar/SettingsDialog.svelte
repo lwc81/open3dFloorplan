@@ -115,7 +115,7 @@
 {#if open}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onclick={close} onkeydown={(e) => { if (e.key === 'Escape') close(); }} role="dialog" tabindex="-1" aria-label="Settings">
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-[420px] max-h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="document">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-105 max-h-[80vh] flex flex-col" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="document">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 pt-4 pb-2">
         <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100">Settings</h2>

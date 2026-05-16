@@ -150,7 +150,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
-  class="fixed z-[100] bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700 text-white w-[320px] select-none"
+  class="fixed z-100 bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700 text-white w-80 select-none"
   style="left: {clampX(screenX + 20)}px; top: {clampY(screenY - 40)}px;"
   onclick={(e) => e.stopPropagation()}
   onpointerdown={(e) => e.stopPropagation()}
@@ -191,7 +191,7 @@
     </button>
   </div>
 
-  <div class="p-3 space-y-3 max-h-[420px] overflow-y-auto">
+  <div class="p-3 space-y-3 max-h-105 overflow-y-auto">
     <!-- Current preview -->
     <div class="flex items-center gap-2 text-xs text-gray-400">
       <span>Current:</span>

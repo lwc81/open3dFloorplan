@@ -227,10 +227,10 @@
 {#if open}
   <!-- Print overlay - visible on screen for preview, and is the print target -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 bg-black/60 z-[100] flex items-start justify-center overflow-auto print-overlay-backdrop" onclick={close} onkeydown={(e) => { if (e.key === 'Escape') close(); }}>
+  <div class="fixed inset-0 bg-black/60 z-100 flex items-start justify-center overflow-auto print-overlay-backdrop" onclick={close} onkeydown={(e) => { if (e.key === 'Escape') close(); }}>
     <!-- Control bar (hidden when printing) -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="fixed top-0 left-0 right-0 bg-slate-800 text-white px-6 py-3 flex items-center gap-4 z-[101] print-hide" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+    <div class="fixed top-0 left-0 right-0 bg-slate-800 text-white px-6 py-3 flex items-center gap-4 z-101 print-hide" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
       <h3 class="font-semibold text-sm">Print Preview</h3>
       <div class="h-4 w-px bg-white/20"></div>
 

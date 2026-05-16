@@ -110,7 +110,7 @@
 {#if open}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
-    class="fixed inset-0 bg-black/40 z-[100] flex justify-center"
+    class="fixed inset-0 bg-black/40 z-100 flex justify-center"
     onclick={() => open = false}
     onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
     role="dialog"

@@ -26,11 +26,11 @@
   {@const clampedX = Math.min(tip.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 320)}
   {@const clampedY = Math.min(tip.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 100)}
   <div
-    class="fixed z-[9999] pointer-events-auto"
+    class="fixed z-9999 pointer-events-auto"
     style="left:{clampedX}px;top:{clampedY}px;"
   >
     <div
-      class="bg-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 max-w-[280px] text-sm leading-relaxed transition-all duration-300 ease-out"
+      class="bg-slate-800 text-white rounded-xl shadow-2xl px-4 py-3 max-w-70 text-sm leading-relaxed transition-all duration-300 ease-out"
       class:opacity-0={!visible}
       class:translate-y-2={!visible}
       class:opacity-100={visible}

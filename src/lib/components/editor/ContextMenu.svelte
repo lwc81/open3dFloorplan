@@ -72,7 +72,7 @@
 {#if visible}
   <div
     bind:this={menuEl}
-    class="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[180px] text-sm select-none"
+    class="fixed z-9999 bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-45 text-sm select-none"
     style="left: {adjustedX}px; top: {adjustedY}px;"
     role="menu"
   >
