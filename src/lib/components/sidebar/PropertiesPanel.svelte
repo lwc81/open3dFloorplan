@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock, backgroundSnapPointMode } from '$lib/stores/project';
+  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock, backgroundSnapPointMode, BACKGROUND_IMAGE_ID } from '$lib/stores/project';
   import { floorMaterials, wallColors } from '$lib/utils/materials';
   import { getCatalogItem } from '$lib/utils/furnitureCatalog';
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
@@ -40,6 +40,7 @@
   let selectedColumn = $derived(floor?.columns?.find(c => c.id === selId) ?? null);
   let selectedTextAnnotation = $derived(floor?.textAnnotations?.find(t => t.id === selId) ?? null);
   let hasBgImage = $derived(!!floor?.backgroundImage);
+  let bgSelected = $derived(selId === BACKGROUND_IMAGE_ID && hasBgImage);
   let selectedRoom = $derived(floor?.rooms?.find(r => r.id === selRoomId) ?? detectedRooms.find(r => r.id === selRoomId) ?? null);
 
   // Helper to get the parent wall for selected door/window
@@ -310,10 +311,10 @@
     { label: '🧶 Carpet', ids: ['carpet-beige', 'carpet-gray'] },
   ];
 
-  let hasSelection = $derived(!!selectedWall || !!selectedDoor || !!selectedWindow || !!selectedFurniture || !!selectedRoom || !!selectedStair || !!selectedColumn || !!selectedTextAnnotation || (!is3D && hasBgImage));
+  let hasSelection = $derived(!!selectedWall || !!selectedDoor || !!selectedWindow || !!selectedFurniture || !!selectedRoom || !!selectedStair || !!selectedColumn || !!selectedTextAnnotation || (!is3D && bgSelected));
 </script>
 
-<div class="{is3D ? 'w-80' : 'w-64'} shrink-0 bg-white border-l border-gray-200 flex flex-col overflow-y-auto p-3 fixed right-0 z-40 shadow-lg" class:hidden={!hasSelection} style="top: 48px; bottom: 36px;">
+<div class="{is3D ? 'w-80' : 'w-64'} shrink-0 bg-white border-l border-gray-200 flex flex-col overflow-y-auto p-3" class:hidden={!hasSelection}>
   {#if selectedWall}
     <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
       <span class="w-6 h-6 bg-gray-200 rounded flex items-center justify-center text-xs">▭</span>
@@ -872,8 +873,8 @@
     </div>
   {/if}
 
-  <!-- Background Image Controls (always show when bg image exists) -->
-  {#if hasBgImage && floor?.backgroundImage}
+  <!-- Background Image Controls (only when the background image itself is the active selection) -->
+  {#if bgSelected && floor?.backgroundImage}
     <div class="mt-4 pt-3 border-t border-gray-200">
       <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <span class="w-6 h-6 bg-blue-100 rounded flex items-center justify-center text-xs">🖼️</span>

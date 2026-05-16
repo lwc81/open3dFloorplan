@@ -40,6 +40,8 @@ export const showFurnitureStore = writable<boolean>(true);
 export const selectedElementId = writable<string | null>(null);
 /** Multi-select: set of element IDs currently selected (used alongside selectedElementId for marquee/shift-click) */
 export const selectedElementIds = writable<Set<string>>(new Set());
+/** Sentinel selectedElementId used when the user explicitly selects the background image. */
+export const BACKGROUND_IMAGE_ID = '__background_image__';
 export const viewMode = writable<'2d' | '3d'>('2d');
 
 // Undo / Redo

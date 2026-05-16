@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { selectedTool, placingFurnitureId, placingDoorType, placingWindowType, placingStair, addStair, placingColumn, placingColumnShape, activeFloor, setBackgroundImage, canvasCamX, canvasCamY } from '$lib/stores/project';
+  import { selectedTool, placingFurnitureId, placingDoorType, placingWindowType, placingStair, addStair, placingColumn, placingColumnShape, activeFloor, setBackgroundImage, canvasCamX, canvasCamY, selectedElementId, BACKGROUND_IMAGE_ID } from '$lib/stores/project';
   import type { Tool } from '$lib/stores/project';
   import type { Door, Window as Win } from '$lib/models/types';
   import { roomPresets, placePreset } from '$lib/utils/roomPresets';
@@ -189,6 +189,7 @@
           rotation: 0,
           locked: false,
         });
+        selectedElementId.set(BACKGROUND_IMAGE_ID);
       };
       reader.readAsDataURL(file);
     };

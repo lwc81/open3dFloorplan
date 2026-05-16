@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationMethod, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement, backgroundSnapPointMode } from '$lib/stores/project';
+  import { activeFloor, selectedTool, selectedElementId, selectedElementIds, selectedRoomId, addWall, addDoor, addWindow, updateWall, moveWallEndpoint, updateDoor, updateWindow, addFurniture, moveFurniture, commitFurnitureMove, rotateFurniture, setFurnitureRotation, scaleFurniture, removeElement, placingFurnitureId, placingRotation, placingDoorType, placingWindowType, detectedRoomsStore, duplicateDoor, duplicateWindow, duplicateFurniture, duplicateWall, moveWallParallel, splitWall, snapEnabled, placingStair, addStair, moveStair, updateStair, placingColumn, placingColumnShape, addColumn, moveColumn, updateColumn, calibrationMode, calibrationMethod, calibrationPoints, updateBackgroundImage, setBackgroundImage, canvasZoom, canvasCamX, canvasCamY, panMode, showFurnitureStore, addGuide, moveGuide, removeGuide, beginUndoGroup, endUndoGroup, layerVisibility, updateRoom, addMeasurement, removeMeasurement, addAnnotation, removeAnnotation, updateAnnotation, addTextAnnotation, removeTextAnnotation, updateTextAnnotation, moveTextAnnotation, toggleFurnitureLock, createGroup, ungroupElements, findGroupForElement, backgroundSnapPointMode, BACKGROUND_IMAGE_ID } from '$lib/stores/project';
   import type { CalibrationMethod } from '$lib/stores/project';
   import type { Point, Wall, Door, Window as Win, FurnitureItem, Stair, Column, GuideLine, Measurement, Annotation, TextAnnotation } from '$lib/models/types';
   import type { Floor, Room } from '$lib/models/types';
@@ -1311,14 +1311,24 @@
     if (!bgImage || !currentFloor?.backgroundImage) return;
     const bg = currentFloor.backgroundImage;
     const s = worldToScreen(bg.position.x, bg.position.y);
+    const sw = bgImage.width * bg.scale * zoom;
+    const sh = bgImage.height * bg.scale * zoom;
     ctx.save();
     ctx.globalAlpha = bg.opacity;
     ctx.translate(s.x, s.y);
     ctx.rotate(bg.rotation * Math.PI / 180);
-    const sw = bgImage.width * bg.scale * zoom;
-    const sh = bgImage.height * bg.scale * zoom;
     ctx.drawImage(bgImage, -sw / 2, -sh / 2, sw, sh);
     ctx.restore();
+    if (currentSelectedId === BACKGROUND_IMAGE_ID) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(bg.rotation * Math.PI / 180);
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]);
+      ctx.strokeRect(-sw / 2, -sh / 2, sw, sh);
+      ctx.restore();
+    }
   }
 
 
@@ -2172,6 +2182,21 @@
     return _findWallAt(p, currentFloor.walls, zoom);
   }
 
+  /** True if the world point lies inside the (rotated, scaled) background image bounds. */
+  function isPointInBackgroundImage(p: Point): boolean {
+    if (!currentFloor?.backgroundImage || !bgImage) return false;
+    const bg = currentFloor.backgroundImage;
+    const dx = p.x - bg.position.x;
+    const dy = p.y - bg.position.y;
+    const a = -bg.rotation * Math.PI / 180;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+    const hw = (bgImage.width * bg.scale) / 2;
+    const hh = (bgImage.height * bg.scale) / 2;
+    return Math.abs(lx) <= hw && Math.abs(ly) <= hh;
+  }
+
   function findHandleAt(p: Point): HandleType | null {
     if (!currentFloor) return null;
     return _findHandleAt(p, currentSelectedId, currentFloor.furniture, zoom);
@@ -2631,6 +2656,11 @@
             const w = currentFloor!.walls.find(wall => wall.id === wid);
             if (w) roomDragStartPositions.set(wid, { start: { ...w.start }, end: { ...w.end } });
           }
+        } else if (!e.shiftKey && isPointInBackgroundImage(wp)) {
+          // Click landed on the background image (and nothing else) → select it
+          selectedElementId.set(BACKGROUND_IMAGE_ID);
+          selectedElementIds.set(new Set());
+          selectedRoomId.set(null);
         } else {
           // Empty space — start marquee selection
           marqueeStart = { ...wp };
