@@ -95,7 +95,7 @@
   let cameraFOV = $state(90);
   let cameraHeight = $state(160);
   let cameraPreviewOpen = $state(false);
-  let cameraPreviewCanvas: HTMLCanvasElement | null = null;
+  let cameraPreviewCanvas: HTMLCanvasElement | null = $state(null);
   let cameraPreviewRenderer: THREE.WebGLRenderer | null = null;
   let cameraPlaced = $state(false);
   let cameraDragMode = $state<'position' | 'lookat' | null>(null);

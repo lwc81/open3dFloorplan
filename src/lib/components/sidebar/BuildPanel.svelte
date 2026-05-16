@@ -605,7 +605,7 @@
                   onmousemove={onItemMouseMove}
                   onmouseleave={onItemMouseLeave}
                 >
-                  <!-- svelte-ignore node_invalid_placement -->
+                  <!-- svelte-ignore node_invalid_placement_ssr -->
                   <span
                     role="button"
                     tabindex="0"
@@ -642,7 +642,7 @@
               onmousemove={onItemMouseMove}
               onmouseleave={onItemMouseLeave}
             >
-              <!-- svelte-ignore node_invalid_placement -->
+              <!-- svelte-ignore node_invalid_placement_ssr -->
               <span
                 role="button"
                 tabindex="0"
@@ -708,8 +708,12 @@
 
 <!-- RoomPlan Import Options Dialog -->
 {#if showImportDialog}
-  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onclick={cancelImport}>
-    <div class="bg-white rounded-xl shadow-2xl w-80 p-5" onclick={(e) => e.stopPropagation()}>
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onclick={cancelImport} role="dialog" aria-modal="true" aria-label="Import RoomPlan" tabindex="-1">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="bg-white rounded-xl shadow-2xl w-80 p-5" onclick={(e) => e.stopPropagation()} role="document">
       <h3 class="text-sm font-bold text-gray-800 mb-1">Import RoomPlan</h3>
       <p class="text-xs text-gray-400 mb-4">{importFileName}</p>
 

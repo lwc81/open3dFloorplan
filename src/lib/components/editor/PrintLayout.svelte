@@ -11,7 +11,7 @@
   let pageSize = $state<'a4' | 'letter'>('letter');
   let orientation = $state<'landscape' | 'portrait'>('landscape');
   let scale = $state('1:50');
-  let printCanvas: HTMLCanvasElement;
+  let printCanvas: HTMLCanvasElement | undefined = $state();
 
   const scaleOptions = ['1:25', '1:50', '1:100', '1:200'];
 

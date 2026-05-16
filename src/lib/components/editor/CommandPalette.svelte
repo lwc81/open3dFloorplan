@@ -114,6 +114,7 @@
     onclick={() => open = false}
     onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
     role="dialog"
+    tabindex="-1"
     aria-label="Command Palette"
   >
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -122,6 +123,8 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={() => {}}
       role="listbox"
+      tabindex="-1"
+      aria-label="Command results"
     >
       <!-- Search input -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
@@ -154,6 +157,7 @@
               onclick={() => execute(item)}
               onkeydown={() => {}}
               role="option"
+              tabindex="-1"
               aria-selected={i === selectedIndex}
             >
               <span class="text-base w-6 text-center flex-shrink-0">{item.icon}</span>

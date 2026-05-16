@@ -484,7 +484,9 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onclick={() => areaOpen = false} onkeydown={(e) => { if (e.key === 'Escape') areaOpen = false; }}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="bg-white rounded-xl shadow-2xl w-[420px] max-h-[80vh] overflow-hidden" onclick={(e) => e.stopPropagation()}>
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="bg-white rounded-xl shadow-2xl w-[420px] max-h-[80vh] overflow-hidden" onclick={(e) => e.stopPropagation()} role="document">
     <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
       <h2 class="text-base font-semibold text-gray-800">📐 Area Summary</h2>
       <button onclick={() => areaOpen = false} class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>

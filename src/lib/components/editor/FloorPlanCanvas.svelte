@@ -116,7 +116,7 @@
   let showStairs = $derived(layerVis.stairs);
   let showLayerPanel = $state(false);
   let showMinimap = $state(true);
-  let minimapCanvas: HTMLCanvasElement;
+  let minimapCanvas: HTMLCanvasElement | undefined = $state();
   const RULER_SIZE = 24;
 
   // Detected rooms
@@ -3800,6 +3800,7 @@
   {/if}
   <!-- Inline room name editor -->
   {#if editingRoomId}
+    <!-- svelte-ignore a11y_autofocus -->
     <input
       type="text"
       class="absolute bg-white border-2 border-blue-500 rounded px-2 py-1 text-sm text-center shadow-lg outline-none"
@@ -3827,6 +3828,7 @@
   {/if}
   <!-- Inline text annotation editor -->
   {#if editingTextAnnotationId}
+    <!-- svelte-ignore a11y_autofocus -->
     <input
       type="text"
       class="absolute bg-white border-2 border-blue-500 rounded px-2 py-1 text-sm text-center shadow-lg outline-none"

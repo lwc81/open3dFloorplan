@@ -147,11 +147,16 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   class="fixed z-[100] bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700 text-white w-[320px] select-none"
   style="left: {clampX(screenX + 20)}px; top: {clampY(screenY - 40)}px;"
   onclick={(e) => e.stopPropagation()}
   onpointerdown={(e) => e.stopPropagation()}
+  role="dialog"
+  aria-label="Material Editor"
+  tabindex="-1"
 >
   <!-- Header -->
   <div class="flex items-center justify-between px-3 py-2 border-b border-gray-700">
@@ -162,6 +167,7 @@
     <button
       onclick={onclose}
       class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition-colors"
+      aria-label="Close Material Editor"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
