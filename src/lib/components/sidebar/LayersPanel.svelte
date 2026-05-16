@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { activeFloor, selectedElementId, layerVisibility } from '$lib/stores/project';
+  import { activeFloor, selectedElementId, selectedRoomId, detectedRoomsStore, layerVisibility, reorderRooms } from '$lib/stores/project';
   import { getCatalogItem } from '$lib/utils/furnitureCatalog';
-  import type { Floor } from '$lib/models/types';
+  import { projectSettings, formatArea } from '$lib/stores/settings';
+  import type { Floor, Room } from '$lib/models/types';
 
   let floor: Floor | null = $state(null);
   activeFloor.subscribe(f => { floor = f; });
@@ -9,7 +10,16 @@
   let selId: string | null = $state(null);
   selectedElementId.subscribe(id => { selId = id; });
 
-  let vis = $state({ walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true });
+  let selRoomId: string | null = $state(null);
+  selectedRoomId.subscribe(id => { selRoomId = id; });
+
+  let detectedRooms: Room[] = $state([]);
+  detectedRoomsStore.subscribe(r => { detectedRooms = r; });
+
+  let settings = $state($projectSettings);
+  projectSettings.subscribe(s => { settings = s; });
+
+  let vis = $state({ walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true, rooms: true });
   layerVisibility.subscribe(v => { vis = v; });
 
   // Collapsed state per category — persisted across panel toggles + sessions
@@ -38,6 +48,50 @@
 
   function select(id: string) {
     selectedElementId.set(id);
+    selectedRoomId.set(null);
+  }
+
+  function selectRoom(id: string) {
+    selectedElementId.set(null);
+    selectedRoomId.set(id);
+  }
+
+  // Drag-to-reorder rooms
+  let dragId: string | null = $state(null);
+  let dropTargetId: string | null = $state(null);
+  let dropPos: 'before' | 'after' = $state('before');
+
+  function onRoomDragStart(e: DragEvent, id: string) {
+    if (!e.dataTransfer) return;
+    dragId = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  }
+
+  function onRoomDragOver(e: DragEvent, id: string) {
+    if (!dragId || dragId === id) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    dropPos = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    dropTargetId = id;
+  }
+
+  function onRoomDrop(e: DragEvent, id: string) {
+    if (!dragId || dragId === id) { resetDrag(); return; }
+    e.preventDefault();
+    const ids = mergedRooms.map(r => r.id).filter(rid => rid !== dragId);
+    let insertAt = ids.indexOf(id);
+    if (insertAt === -1) { resetDrag(); return; }
+    if (dropPos === 'after') insertAt += 1;
+    ids.splice(insertAt, 0, dragId);
+    reorderRooms(ids);
+    resetDrag();
+  }
+
+  function resetDrag() {
+    dragId = null;
+    dropTargetId = null;
   }
 
   interface Category {
@@ -46,6 +100,15 @@
     icon: string;
     items: { id: string; label: string; icon: string }[];
   }
+
+  let mergedRooms: { id: string; name: string; area: number; source: 'persisted' | 'detected' }[] = $derived.by(() => {
+    const persisted = (floor?.rooms ?? []).map(r => ({ id: r.id, name: r.name, area: r.area, source: 'persisted' as const }));
+    const persistedIds = new Set(persisted.map(r => r.id));
+    const extra = detectedRooms
+      .filter(r => !persistedIds.has(r.id))
+      .map(r => ({ id: r.id, name: r.name, area: r.area, source: 'detected' as const }));
+    return [...persisted, ...extra];
+  });
 
   let categories: Category[] = $derived.by(() => {
     if (!floor) return [];
@@ -125,6 +188,63 @@
     🗂 Layers
   </div>
   <div class="flex-1 overflow-y-auto">
+    <!-- Rooms section -->
+    <div class="border-b border-gray-50 relative">
+      <button
+        class="w-full flex items-center gap-1.5 px-2 py-1.5 hover:bg-gray-50 text-left"
+        onclick={() => toggle('rooms')}
+      >
+        <span class="text-[10px] text-gray-400 w-3">{collapsed['rooms'] ? '▸' : '▾'}</span>
+        <span>🏠</span>
+        <span class="font-medium text-gray-700 flex-1">Rooms</span>
+        <span class="text-gray-400 mr-1">{mergedRooms.length}</span>
+      </button>
+      <span
+        role="button"
+        tabindex="0"
+        class="inline-flex p-0.5 rounded hover:bg-gray-200 text-sm leading-none cursor-pointer absolute right-2 top-1.5"
+        class:opacity-30={!vis.rooms}
+        onclick={(e) => { e.stopPropagation(); toggleVisibility('rooms'); }}
+        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleVisibility('rooms'); } }}
+        title={vis.rooms ? 'Hide Rooms' : 'Show Rooms'}
+      >👁</span>
+      {#if !collapsed['rooms']}
+        {#each mergedRooms as room (room.id)}
+          <div class="relative">
+            {#if dropTargetId === room.id && dropPos === 'before'}
+              <div class="absolute left-7 right-2 -top-px h-0.5 bg-blue-500 pointer-events-none z-10"></div>
+            {/if}
+            <button
+              draggable="true"
+              class="w-full flex items-center gap-1.5 pl-7 pr-2 py-1 hover:bg-blue-50 text-left transition-colors cursor-grab active:cursor-grabbing"
+              class:bg-blue-100={selRoomId === room.id}
+              class:text-blue-700={selRoomId === room.id}
+              class:opacity-40={dragId === room.id || !vis.rooms}
+              onclick={() => selectRoom(room.id)}
+              ondragstart={(e) => onRoomDragStart(e, room.id)}
+              ondragover={(e) => onRoomDragOver(e, room.id)}
+              ondrop={(e) => onRoomDrop(e, room.id)}
+              ondragend={resetDrag}
+              title={room.source === 'detected' ? 'Auto-detected — drag to set order' : 'Drag to reorder'}
+            >
+              <span class="text-[10px]">⬜</span>
+              <span class="truncate flex-1">{room.name || 'Unnamed'}</span>
+              <span class="text-[10px] text-gray-400 shrink-0">{formatArea(room.area, settings.units)}</span>
+              {#if room.source === 'detected'}
+                <span class="text-[9px] px-1 rounded bg-amber-100 text-amber-700 shrink-0">auto</span>
+              {/if}
+            </button>
+            {#if dropTargetId === room.id && dropPos === 'after'}
+              <div class="absolute left-7 right-2 -bottom-px h-0.5 bg-blue-500 pointer-events-none z-10"></div>
+            {/if}
+          </div>
+        {/each}
+        {#if mergedRooms.length === 0}
+          <div class="pl-7 pr-2 py-1 text-gray-300 italic">Empty</div>
+        {/if}
+      {/if}
+    </div>
+
     {#each categories as cat}
       <div class="border-b border-gray-50 relative">
         <!-- Category header -->

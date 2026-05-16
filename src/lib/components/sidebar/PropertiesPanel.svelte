@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock, backgroundSnapPointMode, BACKGROUND_IMAGE_ID } from '$lib/stores/project';
+  import { activeFloor, selectedElementId, selectedRoomId, updateWall, updateDoor, updateWindow, updateRoom, removeRoom, updateFurniture, detectedRoomsStore, updateStair, updateColumn, updateBackgroundImage, setBackgroundImage, calibrationMode, calibrationMethod, calibrationPoints, updateTextAnnotation, toggleFurnitureLock, backgroundSnapPointMode, BACKGROUND_IMAGE_ID } from '$lib/stores/project';
   import { floorMaterials, wallColors } from '$lib/utils/materials';
   import { getCatalogItem } from '$lib/utils/furnitureCatalog';
   import { projectSettings, formatLength, formatArea } from '$lib/stores/settings';
@@ -750,6 +750,18 @@
             </div>
           {/each}
         </div>
+      </div>
+      <div class="pt-3 mt-3 border-t border-gray-100">
+        <button
+          class="w-full px-3 py-2 text-sm rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-1.5"
+          onclick={() => {
+            if (!selectedRoom) return;
+            const label = selectedRoom.name || 'this room';
+            if (confirm(`Delete "${label}"?`)) removeRoom(selectedRoom.id);
+          }}
+        >
+          🗑 Delete Room
+        </button>
       </div>
     </div>
 

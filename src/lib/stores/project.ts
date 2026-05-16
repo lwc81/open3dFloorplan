@@ -459,6 +459,41 @@ export function updateRoom(id: string, updates: Partial<{ name: string; floorTex
   });
 }
 
+export function removeRoom(id: string) {
+  mutate((f) => {
+    f.rooms = f.rooms.filter((r) => r.id !== id);
+  }, 'Removed room');
+  detectedRoomsStore.update((rs) => rs.filter((r) => r.id !== id));
+  if (get(selectedRoomId) === id) selectedRoomId.set(null);
+}
+
+/**
+ * Reorder rooms by id. Any id present in `orderedIds` but not in `floor.rooms`
+ * (i.e. auto-detected) is promoted into `floor.rooms` so the manual order persists.
+ * Persisted rooms not mentioned in `orderedIds` are appended at the end.
+ */
+export function reorderRooms(orderedIds: string[]) {
+  const detected = get(detectedRoomsStore);
+  mutate((f) => {
+    const byId = new Map<string, import('$lib/models/types').Room>();
+    for (const r of f.rooms) byId.set(r.id, r);
+
+    const next: import('$lib/models/types').Room[] = [];
+    for (const id of orderedIds) {
+      const existing = byId.get(id);
+      if (existing) {
+        next.push(existing);
+        byId.delete(id);
+      } else {
+        const det = detected.find((r) => r.id === id);
+        if (det) next.push({ ...det });
+      }
+    }
+    for (const remaining of byId.values()) next.push(remaining);
+    f.rooms = next;
+  }, 'Reordered rooms');
+}
+
 export function addFloor(name?: string, copyCurrentLayout = false) {
   const p = get(currentProject);
   if (!p) return;
@@ -778,8 +813,8 @@ export function moveTextAnnotation(id: string, position: { x: number; y: number 
 }
 
 // Layer visibility store (used by LayersPanel and FloorPlanCanvas)
-export const layerVisibility = writable<{ walls: boolean; doors: boolean; windows: boolean; furniture: boolean; stairs: boolean; columns: boolean; guides: boolean; measurements: boolean; annotations: boolean }>({
-  walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true,
+export const layerVisibility = writable<{ walls: boolean; doors: boolean; windows: boolean; furniture: boolean; stairs: boolean; columns: boolean; guides: boolean; measurements: boolean; annotations: boolean; rooms: boolean }>({
+  walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true, rooms: true,
 });
 
 // --- Lock ---

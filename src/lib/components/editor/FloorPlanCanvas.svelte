@@ -95,7 +95,7 @@
   let showRulers = $state(true);
 
   // Layer visibility toggles
-  let layerVis = $state({ walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true });
+  let layerVis = $state({ walls: true, doors: true, windows: true, furniture: true, stairs: true, columns: true, guides: true, measurements: true, annotations: true, rooms: true });
   // Sync showFurnitureStore ↔ layerVisibility.furniture
   let showFurniture = $derived(layerVis.furniture);
   $effect(() => { showFurnitureStore.set(layerVis.furniture); });
@@ -1364,7 +1364,7 @@
     const multiIds = currentSelectedIds;
     function isSelected(id: string) { return id === selId || multiIds.has(id); }
 
-    drawRooms();
+    if (layerVis.rooms) drawRooms();
     drawSnapPoints();
 
     if (layerVis.walls) {
