@@ -4100,7 +4100,7 @@
   {/if}
 
   <!-- Zoom Controls (bottom-left) -->
-  <div class="absolute bottom-3 left-3 z-20 flex items-center gap-1 bg-white rounded-lg shadow-lg border border-gray-200 px-1 py-0.5">
+  <div class="absolute bottom-4 left-36 z-20 flex items-center gap-1 bg-white rounded-lg shadow-lg border border-gray-200 px-1 py-0.5">
     <button
       class="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800 font-bold text-lg"
       title="Zoom Out (−)"
