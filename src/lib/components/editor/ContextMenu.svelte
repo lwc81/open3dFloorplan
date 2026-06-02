@@ -138,6 +138,11 @@
       <button class="ctx-item" role="menuitem" onclick={() => clickItem('change-floor-texture')}>
         <span class="ctx-icon">🎨</span> Change Floor Texture
       </button>
+      {#if targetRoom?.labelOffset && (targetRoom.labelOffset.x !== 0 || targetRoom.labelOffset.y !== 0)}
+        <button class="ctx-item" role="menuitem" onclick={() => clickItem('reset-label-position')}>
+          <span class="ctx-icon">↺</span> Reset Label Position
+        </button>
+      {/if}
       <div class="ctx-sep"></div>
       <button class="ctx-item ctx-danger" role="menuitem" onclick={() => clickItem('delete-room')}>
         <span class="ctx-icon">🗑️</span> Delete Room

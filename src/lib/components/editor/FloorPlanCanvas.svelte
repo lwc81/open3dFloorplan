@@ -2235,20 +2235,10 @@
       const centroid = roomCentroid(poly);
       const lx = centroid.x + (room.labelOffset?.x ?? 0);
       const ly = centroid.y + (room.labelOffset?.y ?? 0);
-      // Check if click is within label area (approx 80x40 world units)
-      const hitW = 80 / zoom;
-      const hitH = 40 / zoom;
+      // Label is rendered as two stacked lines (name + area), ~60x30 world units at zoom=1
+      const hitW = 60 / zoom;
+      const hitH = 28 / zoom;
       if (Math.abs(p.x - lx) < hitW && Math.abs(p.y - ly) < hitH) {
-        // Check if clicking the reset icon
-        if (room.labelOffset && (room.labelOffset.x !== 0 || room.labelOffset.y !== 0)) {
-          const resetOffX = 50 / zoom; // approximate reset icon position
-          if (p.x > lx + resetOffX * 0.5 && Math.abs(p.y - ly) < 15 / zoom) {
-            // Reset label position
-            updateRoom(room.id, { labelOffset: undefined });
-            detectedRoomsStore.update(rooms => rooms.map(r => r.id === room.id ? { ...r, labelOffset: undefined } : r));
-            return null; // consumed click
-          }
-        }
         return room;
       }
     }
@@ -3675,6 +3665,12 @@
         // Select the room so PropertiesPanel shows it
         if (ctxMenuRoom) selectedRoomId.set(ctxMenuRoom.id);
         break;
+      case 'reset-label-position':
+        if (ctxMenuRoom) {
+          updateRoom(ctxMenuRoom.id, { labelOffset: undefined });
+          detectedRoomsStore.update(rooms => rooms.map(r => r.id === ctxMenuRoom!.id ? { ...r, labelOffset: undefined } : r));
+        }
+        break;
       case 'delete-room':
         if (ctxMenuRoom) {
           beginUndoGroup();
@@ -3742,6 +3738,7 @@
     isCalibrating || calibrationBusy ? 'crosshair' :
     draggingFurnitureId ? 'move' :
     draggingRoomId ? 'move' :
+    draggingRoomLabelId ? 'move' :
     draggingMultiSelect ? 'move' :
     draggingDoorId ? 'move' :
     draggingWindowId ? 'move' :

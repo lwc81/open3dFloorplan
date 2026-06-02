@@ -1465,13 +1465,24 @@ export function drawRooms(
     }
 
     const centroid = roomCentroid(poly);
-    const sc = wts(cs, centroid.x, centroid.y);
+    const labelX = centroid.x + (room.labelOffset?.x ?? 0);
+    const labelY = centroid.y + (room.labelOffset?.y ?? 0);
+    const sc = wts(cs, labelX, labelY);
     const fontSize = Math.max(11, 13 * zoom);
+    const areaFontSize = Math.max(10, 11 * zoom);
+    const hasName = !!room.name && room.name.trim().length > 0;
     if (showRoomLabels) {
       ctx.fillStyle = '#9ca3af';
-      ctx.font = `${fontSize}px sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(`${room.name} (${formatArea(room.area, dimSettings.units)})`, sc.x, sc.y);
+      if (hasName) {
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.fillText(room.name, sc.x, sc.y - fontSize * 0.55);
+        ctx.font = `${areaFontSize}px sans-serif`;
+        ctx.fillText(formatArea(room.area, dimSettings.units), sc.x, sc.y + areaFontSize * 0.55);
+      } else {
+        ctx.font = `${areaFontSize}px sans-serif`;
+        ctx.fillText(formatArea(room.area, dimSettings.units), sc.x, sc.y);
+      }
     }
 
     if (showDimensions && dimSettings.showInternalDimensions && poly.length >= 3) {
@@ -1482,7 +1493,8 @@ export function drawRooms(
       if (roomW > 0.1 && roomD > 0.1) {
         const dimFontSize = Math.max(9, 10 * zoom);
         ctx.fillStyle = '#b0b8c4'; ctx.font = `${dimFontSize}px sans-serif`;
-        ctx.fillText(`${formatLength(roomW * 100, dimSettings.units)} × ${formatLength(roomD * 100, dimSettings.units)}`, sc.x, sc.y + fontSize + 2);
+        const labelHeight = showRoomLabels ? (hasName ? fontSize + areaFontSize : areaFontSize) : 0;
+        ctx.fillText(`${formatLength(roomW * 100, dimSettings.units)} × ${formatLength(roomD * 100, dimSettings.units)}`, sc.x, sc.y + labelHeight / 2 + dimFontSize);
       }
     }
   }
