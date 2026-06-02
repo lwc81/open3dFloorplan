@@ -1041,7 +1041,7 @@
 
   function drawRooms() {
     if (!currentFloor) return;
-    _drawRooms(getCS(), currentFloor, detectedRooms, currentSelectedRoomId, showRoomLabels, showDimensions, dimSettings);
+    _drawRooms(getCS(), currentFloor, detectedRooms, currentSelectedRoomId, showRoomLabels, showDimensions, dimSettings, layerVis.rooms);
   }
 
   function drawAngleGuides(start: Point) {
@@ -1364,7 +1364,7 @@
     const multiIds = currentSelectedIds;
     function isSelected(id: string) { return id === selId || multiIds.has(id); }
 
-    if (layerVis.rooms) drawRooms();
+    drawRooms();
     drawSnapPoints();
 
     if (layerVis.walls) {

@@ -1424,6 +1424,7 @@ export function drawRooms(
   showRoomLabels: boolean,
   showDimensions: boolean,
   dimSettings: ProjectSettings,
+  showRoomFloors: boolean = true
 ): void {
   const { ctx, zoom } = cs;
   for (let ri = 0; ri < detectedRooms.length; ri++) {
@@ -1431,13 +1432,16 @@ export function drawRooms(
     const poly = getRoomPolygon(room, floor.walls);
     if (poly.length < 3) continue;
     const screenPoly = poly.map(p => wts(cs, p.x, p.y));
-    ctx.fillStyle = getRoomFill(room, ri);
-    ctx.beginPath();
-    ctx.moveTo(screenPoly[0].x, screenPoly[0].y);
-    for (let i = 1; i < screenPoly.length; i++) ctx.lineTo(screenPoly[i].x, screenPoly[i].y);
-    ctx.closePath(); ctx.fill();
+    
+    if (showRoomFloors) {
+      ctx.fillStyle = getRoomFill(room, ri);
+      ctx.beginPath();
+      ctx.moveTo(screenPoly[0].x, screenPoly[0].y);
+      for (let i = 1; i < screenPoly.length; i++) ctx.lineTo(screenPoly[i].x, screenPoly[i].y);
+      ctx.closePath(); ctx.fill();
 
-    drawRoomFloorPattern(cs, room, screenPoly);
+      drawRoomFloorPattern(cs, room, screenPoly);
+    }
 
     const isSelected = currentSelectedRoomId === room.id;
     if (isSelected) {
