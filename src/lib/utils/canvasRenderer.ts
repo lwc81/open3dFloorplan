@@ -65,6 +65,39 @@ function wallThicknessScreen(w: Wall, zoom: number): number {
   return Math.max(w.thickness * zoom, 4);
 }
 
+function pointInPoly(p: Point, poly: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if ((poly[i].y > p.y) !== (poly[j].y > p.y) &&
+        p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Pick which perpendicular side of a wall faces the building exterior.
+ * Returns +1 or -1 to multiply the canonical normal (-dy/len, dx/len).
+ * If both sides are inside a room (interior wall) or neither is, returns 0
+ * so callers can fall back to a different heuristic (e.g. viewport-clamping).
+ */
+function exteriorSide(w: Wall, roomPolygons: Point[][]): number {
+  if (!roomPolygons || roomPolygons.length === 0) return 0;
+  const mid = wallPointAt(w, 0.5);
+  const tan = wallTangentAt(w, 0.5);
+  const wnx = -tan.y;
+  const wny = tan.x;
+  const probe = w.thickness / 2 + 2;
+  const pPos = { x: mid.x + wnx * probe, y: mid.y + wny * probe };
+  const pNeg = { x: mid.x - wnx * probe, y: mid.y - wny * probe };
+  const posInside = roomPolygons.some(poly => pointInPoly(pPos, poly));
+  const negInside = roomPolygons.some(poly => pointInPoly(pNeg, poly));
+  if (posInside && !negInside) return -1;
+  if (!posInside && negInside) return 1;
+  return 0;
+}
+
 // ── Coordinate conversion (local helpers using CanvasState) ─────────
 
 function wts(cs: CanvasState, wx: number, wy: number): { x: number; y: number } {
@@ -119,6 +152,7 @@ export function drawWall(
   selected: boolean,
   showDimensions: boolean,
   dimSettings: ProjectSettings,
+  roomPolygons: Point[][] = [],
 ): void {
   const { ctx, zoom, width, height } = cs;
   const s = wts(cs, w.start.x, w.start.y);
@@ -162,12 +196,14 @@ export function drawWall(
       const midS = wts(cs, midPt.x, midPt.y);
       const midTan = wallTangentAt(w, 0.5);
       const offsetDist = thickness / 2 + 16;
+      const extSide = exteriorSide(w, roomPolygons);
+      const dimSide = extSide !== 0 ? extSide : 1;
       ctx.fillStyle = dimSettings.dimensionLineColor;
       const fontSize = Math.max(10, 11 * zoom);
       ctx.font = `${fontSize}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(formatLength(wlen, dimSettings.units), midS.x - midTan.y * offsetDist, midS.y + midTan.x * offsetDist);
+      ctx.fillText(formatLength(wlen, dimSettings.units), midS.x - midTan.y * offsetDist * dimSide, midS.y + midTan.x * offsetDist * dimSide);
     }
 
     if (selected) {
@@ -267,10 +303,18 @@ export function drawWall(
   const nnx = (-dy / len);
   const nny = (dx / len);
 
-  let dimSide = 1;
-  const testX = mx + nnx * offsetDist;
-  const testY = my + nny * offsetDist;
-  if (testX < 10 || testX > width - 10 || testY < 10 || testY > height - 10) dimSide = -1;
+  let dimSide = exteriorSide(w, roomPolygons);
+  if (dimSide === 0) {
+    dimSide = 1;
+    const testX = mx + nnx * offsetDist;
+    const testY = my + nny * offsetDist;
+    if (testX < 10 || testX > width - 10 || testY < 10 || testY > height - 10) dimSide = -1;
+  } else {
+    // Still clamp to viewport if exterior side would render off-screen.
+    const testX = mx + nnx * offsetDist * dimSide;
+    const testY = my + nny * offsetDist * dimSide;
+    if (testX < 10 || testX > width - 10 || testY < 10 || testY > height - 10) dimSide = -dimSide;
+  }
 
   const dOffX = nnx * offsetDist * dimSide;
   const dOffY = nny * offsetDist * dimSide;

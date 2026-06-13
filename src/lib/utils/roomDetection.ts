@@ -1,4 +1,4 @@
-import type { Wall, Point, Room } from '$lib/models/types';
+import type { Wall, Point, Room, Floor } from '$lib/models/types';
 
 const EPSILON = 5; // snap distance for matching endpoints
 
@@ -330,6 +330,41 @@ function legacyChain(room: Room, walls: Wall[]): Point[] {
     current = next;
   }
   return verts;
+}
+
+/**
+ * Detect rooms from the floor's walls and merge in user-edited fields
+ * (name, floorTexture, color, roomType, labelOffset) from `floor.rooms`.
+ *
+ * Matching is by wall-id set, mirroring the reconciliation in
+ * FloorPlanCanvas.updateDetectedRooms — `detectRooms` generates fresh
+ * ids on every call, so id-matching cannot be used.
+ *
+ * Use this anywhere you need rooms "as the user sees them" (exports,
+ * print layouts, schedules) instead of calling detectRooms directly,
+ * which yields generic "Room 1, Room 2, ..." names.
+ */
+export function getResolvedRooms(floor: Floor): Room[] {
+  const detected = detectRooms(floor.walls);
+  const saved = floor.rooms ?? [];
+  for (const nr of detected) {
+    const nrSet = new Set(nr.walls);
+    const match = saved.find(sr => {
+      const srSet = new Set(sr.walls);
+      if (srSet.size !== nrSet.size) return false;
+      for (const w of nrSet) if (!srSet.has(w)) return false;
+      return true;
+    });
+    if (match) {
+      nr.id = match.id;
+      nr.name = match.name;
+      if (match.floorTexture) nr.floorTexture = match.floorTexture;
+      if (match.color) nr.color = match.color;
+      if (match.roomType) nr.roomType = match.roomType;
+      if (match.labelOffset) nr.labelOffset = match.labelOffset;
+    }
+  }
+  return detected;
 }
 
 export function roomCentroid(polygon: Point[]): Point {

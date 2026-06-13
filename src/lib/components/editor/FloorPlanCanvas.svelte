@@ -699,8 +699,8 @@
     _drawWindowDistanceDimensions(getCS(), wall, window, dimSettings);
   }
 
-  function drawWall(w: Wall, selected: boolean) {
-    _drawWall(getCS(), w, selected, showDimensions, dimSettings);
+  function drawWall(w: Wall, selected: boolean, roomPolygons: Point[][] = []) {
+    _drawWall(getCS(), w, selected, showDimensions, dimSettings, roomPolygons);
   }
 
   function drawDoorOnWall(wall: Wall, door: Door) {
@@ -1368,7 +1368,8 @@
     drawSnapPoints();
 
     if (layerVis.walls) {
-      for (const w of floor.walls) drawWall(w, isSelected(w.id));
+      const roomPolygons = detectedRooms.map(r => getRoomPolygon(r, floor.walls)).filter(p => p.length >= 3);
+      for (const w of floor.walls) drawWall(w, isSelected(w.id), roomPolygons);
       drawWallJoints(floor, selId);
     }
 
